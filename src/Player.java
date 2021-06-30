@@ -4,6 +4,8 @@ public abstract class Player {
     private String name;
     private Hand hand;
     private int bet;
+    private int score;
+    private int trickScore;
 
     public Player() {
         this(null);
@@ -12,6 +14,8 @@ public abstract class Player {
     public Player(String name) {
         this.name = name;
         this.hand = null;
+        this.score = 0;
+        this.trickScore = 0;
     }
 
     public String getName() {
@@ -36,5 +40,25 @@ public abstract class Player {
 
     public abstract void bet();
 
-    public abstract Card playCard(List<Card> cardsPlayed);
+    public int getScore() {
+        return score;
+    }
+
+    public void increaseScore(int n) {
+        score += n;
+    }
+
+    public int getTrickScore() {
+        return trickScore;
+    }
+
+    public void wonTrick() {
+        trickScore++;
+    }
+
+    public void resetTrickScore() {
+        trickScore = 0;
+    }
+
+    public abstract Card playCard(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken);
 }

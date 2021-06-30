@@ -13,6 +13,7 @@ public class Game {
     private int round;
     private int roundStartingPlayer;
     private boolean trumpBroken;
+    private final int roundBonus = 10;
 
     private static List<String> names = new ArrayList<>() {{
         add("You");
@@ -41,7 +42,7 @@ public class Game {
         players = new ArrayList<>();
         players.add(new Human(playerNames.get(0)));
         for (int i = 1; i < numPlayers; i++) {
-            players.add(new AI(playerNames.get(i)));
+            players.add(new Human(playerNames.get(i)));
         }
         round = 0;
         Random r = new Random();
@@ -81,6 +82,8 @@ public class Game {
             //set trump suit
             Suit trump = deck.draw().getSuit();
 
+            System.out.println("The trump suit is " + trump);
+
             //bet
             int currentPlayer = roundStartingPlayer;
             bet(currentPlayer);
@@ -90,22 +93,28 @@ public class Game {
                 //for each player
                 List<Card> cardsPlayed = new ArrayList<>();
 
-                //have separate step for first person
-
-
-                Suit leading = cardsPlayed.get(0).getSuit();
+                Suit leading = null;
                 for (int j = 0; j < numPlayers(); j++) {
                     //play a card
-                    //Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
-                    //cardsPlayed.add(card);
+                    Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
+                    cardsPlayed.add(card);
+                    if (j == 0) {
+                        leading = cardsPlayed.get(0).getSuit();
+                    }
                 }
                 //determine winner of trick
                 int winnerIndex = determineTrickWinner(cardsPlayed, trump);
+                Player winner = getPlayer(winnerIndex);
+                winner.wonTrick();
             }
             //adjust scores accordingly
+            adjustScores();
+
             round++;
         }
         //determine winner
+        Player winner = determineWinner();
+        System.out.println(winner.getName() + " won the game!");
     }
 
     private void bet(int currentPlayer) {
@@ -116,21 +125,17 @@ public class Game {
         }
     }
 
-    static int determineTrickWinner(List<Card> cardsPlayed, Suit trump) {
+    private int playTrick() {
+        return 0;
+    }
+
+    private int determineTrickWinner(List<Card> cardsPlayed, Suit trump) {
         int winner = 0;
         Card winningCard = cardsPlayed.get(winner);
         for (int i = 1; i < cardsPlayed.size(); i++) {
             Card card = cardsPlayed.get(i);
-            Suit suit = card.getSuit();
-            if (suit != winningCard.getSuit()) {
-                if (suit == trump) {
-                    winner = i;
-                    winningCard = card;
-                } else {
-                    continue;
-                }
-            } else if (card.getValue().compareTo(winningCard.getValue()) > 0) {
-                winner  = i;
+            if (isHigher(winningCard, card, trump)) {
+                winner = i;
                 winningCard = card;
             }
         }
@@ -151,6 +156,27 @@ public class Game {
         } else {
             return false;
         }
+    }
+
+    public void adjustScores() {
+        for (Player player : getPlayers()) {
+            if (player.getBet() == player.getTrickScore()) {
+                player.increaseScore(player.getTrickScore() + roundBonus);
+            } else {
+                player.increaseScore(player.getTrickScore());
+            }
+            player.resetTrickScore();
+        }
+    }
+
+    public Player determineWinner() {
+        Player winner = getPlayer(0);
+        for (Player player : players) {
+            if (player.getScore() > winner.getScore()) {
+                winner = player;
+            }
+        }
+        return winner;
     }
 
     //Improve
@@ -190,11 +216,12 @@ public class Game {
         Game game = new Game(names);
         game.play();
 
-
+        /*
         for (Player player : game.getPlayers()) {
             Hand hand = player.getHand();
             System.out.println(player.getName() + hand.getCards());
         }
         System.out.println(game.getDeck());
+        */
     }
 }

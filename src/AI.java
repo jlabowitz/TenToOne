@@ -7,11 +7,11 @@ public class AI extends Player{
 
     @Override
     public void bet() {
-
+        setBet(getHand().getNumCards()/5);
     }
 
     @Override
-    public Card playCard(List<Card> cardsPlayed) {
-        return null;
+    public Card playCard(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken) {
+        return cardsPlayed.remove(0);
     }
 }

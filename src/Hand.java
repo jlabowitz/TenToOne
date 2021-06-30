@@ -23,4 +23,13 @@ public class Hand {
     public void addCard(Card card) {
         cards.add(card);
     }
+
+    public Card getCard(int index) {
+        return cards.get(index);
+    }
+
+    @Override
+    public String toString() {
+        return cards.toString();
+    }
 }
