@@ -12,6 +12,7 @@ public class AI extends Player{
 
     @Override
     public Card playCard(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken) {
-        return cardsPlayed.remove(0);
+        System.out.println(getHand().getCard(0));
+        return getHand().getCard(0);
     }
 }

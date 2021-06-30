@@ -12,7 +12,7 @@ public class Human extends Player{
     public void bet() {
         Scanner playerInput = new Scanner(System.in);
         System.out.println(getHand());
-        System.out.println("What do you want to bet?");
+        System.out.println(getName() + ", what do you want to bet?");
         setBet(playerInput.nextInt());
     }
 
@@ -20,8 +20,21 @@ public class Human extends Player{
     public Card playCard(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken) {
         Scanner playerInput = new Scanner(System.in);
         System.out.println(getHand());
-        System.out.println("Which card do you want to play?");
+        System.out.println(getName() + ", which card do you want to play?");
+
         int cardIndex = playerInput.nextInt();
-        return getHand().getCard(cardIndex);
+
+        while (!checkIndex(cardIndex, getHand())) {
+            System.out.println(cardIndex + " is not a valid value");
+            cardIndex = playerInput.nextInt();
+        }
+
+        Card played = getHand().getCard(cardIndex);
+        System.out.println(getName() + " played the " + played);
+        return played;
+    }
+
+    public boolean checkIndex(int cardIndex, Hand hand) {
+        return 0 <= cardIndex && cardIndex < hand.getNumCards();
     }
 }

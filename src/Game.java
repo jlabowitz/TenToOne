@@ -41,7 +41,8 @@ public class Game {
         deck = new Deck();
         players = new ArrayList<>();
         players.add(new Human(playerNames.get(0)));
-        for (int i = 1; i < numPlayers; i++) {
+        players.add(new Human(playerNames.get(1)));
+        for (int i = 2; i < numPlayers; i++) {
             players.add(new Human(playerNames.get(i)));
         }
         round = 0;
@@ -101,15 +102,20 @@ public class Game {
                     if (j == 0) {
                         leading = cardsPlayed.get(0).getSuit();
                     }
+                    currentPlayer = nextPlayer(currentPlayer);
                 }
                 //determine winner of trick
                 int winnerIndex = determineTrickWinner(cardsPlayed, trump);
                 Player winner = getPlayer(winnerIndex);
                 winner.wonTrick();
+                System.out.println(winner.getName() + " won the trick.");
+
+                //winner of trick starts next round;
+                currentPlayer = winnerIndex;
             }
             //adjust scores accordingly
             adjustScores();
-
+            roundStartingPlayer = nextPlayer(roundStartingPlayer);
             round++;
         }
         //determine winner
