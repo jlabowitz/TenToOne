@@ -24,12 +24,13 @@ public class Human extends Player{
 
         int cardIndex = playerInput.nextInt();
 
-        while (!checkIndex(cardIndex, getHand())) {
+        while (!checkIndex(cardIndex, getHand()) || !legalCards(cardsPlayed, leading, trump, trumpBroken).contains(getHand().getCard(cardIndex))) {
             System.out.println(cardIndex + " is not a valid value");
             cardIndex = playerInput.nextInt();
         }
 
-        Card played = getHand().getCard(cardIndex);
+
+        Card played = getHand().playCard(cardIndex);
         System.out.println(getName() + " played the " + played);
         return played;
     }

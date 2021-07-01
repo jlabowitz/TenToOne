@@ -45,8 +45,10 @@ public class Game extends Canvas implements Runnable{
     */
 
     public Game(List<String> playerNames) {
-        new Window(WIDTH, HEIGHT, "Ten to One", this);
         handler = new Handler();
+        //new Window(WIDTH, HEIGHT, "Ten to One", this);
+
+        handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
 
         int numPlayers = playerNames.size();
         assert numPlayers <= 5 : "You cannot have more than 5 players";
@@ -54,9 +56,9 @@ public class Game extends Canvas implements Runnable{
 
         players = new ArrayList<>();
         players.add(new Human(playerNames.get(0)));
-        players.add(new Human(playerNames.get(1)));
-        for (int i = 2; i < numPlayers; i++) {
-            players.add(new Human(playerNames.get(i)));
+        //players.add(new Human(playerNames.get(1)));
+        for (int i = 1; i < numPlayers; i++) {
+            players.add(new AI(playerNames.get(i)));
         }
         round = 0;
         Random r = new Random();
@@ -111,6 +113,9 @@ public class Game extends Canvas implements Runnable{
                 for (int j = 0; j < numPlayers(); j++) {
                     //play a card
                     Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
+                    if (!trumpBroken && card.getSuit() == trump) {
+                        trumpBroken = true;
+                    }
                     cardsPlayed.add(card);
                     if (j == 0) {
                         leading = cardsPlayed.get(0).getSuit();
@@ -126,7 +131,7 @@ public class Game extends Canvas implements Runnable{
                 System.out.println(winner.getName() + " won the trick.");
 
                 //winner of trick starts next round;
-                currentPlayer = winnerIndex;
+                currentPlayer = actualWinner;
             }
             //adjust scores accordingly
             adjustScores();

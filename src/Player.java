@@ -61,4 +61,27 @@ public abstract class Player {
     }
 
     public abstract Card playCard(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken);
+
+    //Method could be made static or put in another file
+    public List<Card> legalCards(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken) {
+        Hand hand = getHand();
+        if (cardsPlayed.isEmpty()) {
+            if (trumpBroken) {
+                return hand.getCards();
+            } else {
+                List<Card> playable = hand.getCardsNotOfSuit(trump);
+                if (!playable.isEmpty()) {
+                    return playable;
+                } else {
+                    return hand.getCards();
+                }
+            }
+        } else {
+            if (hand.hasSuit(leading)) {
+                return hand.getCardsOfSuit(leading);
+            } else {
+                return hand.getCards();
+            }
+        }
+    }
 }
