@@ -16,6 +16,7 @@ public class Game extends Canvas implements Runnable{
     public static final int WIDTH = 640, HEIGHT = WIDTH/12 * 9;
     private Thread thread;
     private boolean running = false;
+    private Handler handler;
 
     private Deck deck;
     private List<Player> players;
@@ -45,6 +46,7 @@ public class Game extends Canvas implements Runnable{
 
     public Game(List<String> playerNames) {
         new Window(WIDTH, HEIGHT, "Ten to One", this);
+        handler = new Handler();
 
         int numPlayers = playerNames.size();
         assert numPlayers <= 5 : "You cannot have more than 5 players";
@@ -285,7 +287,7 @@ public class Game extends Canvas implements Runnable{
     }
 
     private void tick() {
-
+        handler.tick();
     }
 
     private void render() {
@@ -299,6 +301,8 @@ public class Game extends Canvas implements Runnable{
 
         g.setColor(Color.black);
         g.fillRect(0, 0, WIDTH, HEIGHT);
+
+        handler.render(g);
 
         g.dispose();
         bs.show();
