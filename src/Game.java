@@ -93,7 +93,7 @@ public class Game {
             for (int i = 0; i < numCardsThisRound(); i++) {
                 //for each player
                 List<Card> cardsPlayed = new ArrayList<>();
-
+                int trickStartPlayer = currentPlayer;
                 Suit leading = null;
                 for (int j = 0; j < numPlayers(); j++) {
                     //play a card
@@ -106,7 +106,9 @@ public class Game {
                 }
                 //determine winner of trick
                 int winnerIndex = determineTrickWinner(cardsPlayed, trump);
-                Player winner = getPlayer(winnerIndex);
+                int actualWinner = convertWinnerIndex(winnerIndex, trickStartPlayer);
+
+                Player winner = getPlayer(actualWinner);
                 winner.wonTrick();
                 System.out.println(winner.getName() + " won the trick.");
 
@@ -115,6 +117,7 @@ public class Game {
             }
             //adjust scores accordingly
             adjustScores();
+            printScores();
             roundStartingPlayer = nextPlayer(roundStartingPlayer);
             round++;
         }
@@ -135,7 +138,7 @@ public class Game {
         return 0;
     }
 
-    private int determineTrickWinner(List<Card> cardsPlayed, Suit trump) {
+    static int determineTrickWinner(List<Card> cardsPlayed, Suit trump) {
         int winner = 0;
         Card winningCard = cardsPlayed.get(winner);
         for (int i = 1; i < cardsPlayed.size(); i++) {
@@ -148,8 +151,12 @@ public class Game {
         return winner;
     }
 
+    public int convertWinnerIndex(int winnerIndex, int trickStartPlayer) {
+        return (winnerIndex + trickStartPlayer) % numPlayers();
+    }
+
     /// Returns true if CARD is higher values than WINNINGCARD
-    private boolean isHigher(Card winningCard, Card card, Suit trump) {
+    private static boolean isHigher(Card winningCard, Card card, Suit trump) {
         Suit suit = card.getSuit();
         if (suit != winningCard.getSuit()) {
             if (suit == trump) {
@@ -172,6 +179,12 @@ public class Game {
                 player.increaseScore(player.getTrickScore());
             }
             player.resetTrickScore();
+        }
+    }
+
+    public void printScores() {
+        for (Player player : getPlayers()) {
+            System.out.println(player.getName() + " has " + player.getScore() + " points.");
         }
     }
 

@@ -9,14 +9,14 @@ public class TestGame {
     @Test
     public void determineTrickWinnerTest() {
         List<Card> cardsPlayed = new ArrayList<>();
-        cardsPlayed.add(new Card(Suit.CLUBS, CardValue.TEN));
-        cardsPlayed.add(new Card(Suit.CLUBS, CardValue.ACE));
-        cardsPlayed.add(new Card(Suit.DIAMONDS, CardValue.FIVE));
-        cardsPlayed.add(new Card(Suit.HEARTS, CardValue.ACE));
-        cardsPlayed.add(new Card(Suit.CLUBS, CardValue.FOUR));
+        cardsPlayed.add(new Card(Suit.DIAMONDS, CardValue.QUEEN)); //P5
+        cardsPlayed.add(new Card(Suit.CLUBS, CardValue.FIVE)); //YOU
+        cardsPlayed.add(new Card(Suit.SPADES, CardValue.ACE));
+        cardsPlayed.add(new Card(Suit.SPADES, CardValue.FIVE));
+        cardsPlayed.add(new Card(Suit.CLUBS, CardValue.THREE));
 
-        Suit trump = Suit.DIAMONDS;
-        //int actual = Game.determineTrickWinner(cardsPlayed, trump);
-        //assertEquals(2, actual);
+        Suit trump = Suit.HEARTS;
+        int actual = Game.determineTrickWinner(cardsPlayed, trump);
+        assertEquals(0, actual);
     }
 }
