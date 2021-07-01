@@ -1,3 +1,6 @@
+import java.awt.*;
+import java.awt.image.BufferStrategy;
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -7,7 +10,13 @@ import static org.junit.Assert.assertEquals;
 /***
  Each game has up to 5 players and consists of 10 rounds with the number of cards in hand decreasing from 10 to 1.
  ***/
-public class Game {
+public class Game extends Canvas implements Runnable{
+    @Serial
+    private static final long serialVersionUID = 7694947508904043283L;
+    public static final int WIDTH = 640, HEIGHT = WIDTH/12 * 9;
+    private Thread thread;
+    private boolean running = false;
+
     private Deck deck;
     private List<Player> players;
     private int round;
@@ -35,10 +44,12 @@ public class Game {
     */
 
     public Game(List<String> playerNames) {
+        new Window(WIDTH, HEIGHT, "Ten to One", this);
+
         int numPlayers = playerNames.size();
         assert numPlayers <= 5 : "You cannot have more than 5 players";
 
-        deck = new Deck();
+
         players = new ArrayList<>();
         players.add(new Human(playerNames.get(0)));
         players.add(new Human(playerNames.get(1)));
@@ -56,8 +67,7 @@ public class Game {
     }
 
     private void deal() {
-        for (int i = 0; i < players.size(); i++) {
-            Player player = players.get(i);
+        for (Player player : players) {
             String name = player.getName();
             assert player.getHand() == null || player.getHand().getNumCards() == 0 : String.format("Player '%s' hand is not empty", name);
         }
@@ -79,6 +89,7 @@ public class Game {
         while(round < 10) {
             //deal
             trumpBroken = false;
+            deck = new Deck();
             deal();
             //set trump suit
             Suit trump = deck.draw().getSuit();
@@ -230,17 +241,72 @@ public class Game {
         }
     }
 
+    public synchronized void start() {
+        thread = new Thread(this);
+        thread.start();
+        running = true;
+    }
+
+    public synchronized void stop() {
+        try {
+            thread.join();
+            running = false;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void run() {
+        long lastTime = System.nanoTime();
+        double amountOfTicks = 60.0;
+        double ns = 1000000000 / amountOfTicks;
+        double delta = 0;
+        long timer = System.currentTimeMillis();
+        int frames = 0;
+        while (running) {
+            long now = System.nanoTime();
+            delta += (now - lastTime) / ns;
+            lastTime = now;
+            while (delta >= 1) {
+                tick();
+                delta--;
+            }
+            if (running) {
+                render();
+            }
+            frames++;
+            if (System.currentTimeMillis() - timer > 1000) {
+                timer += 1000;
+                System.out.println("FPS: " + frames);
+                frames = 0;
+            }
+        }
+        stop();
+    }
+
+    private void tick() {
+
+    }
+
+    private void render() {
+        BufferStrategy bs = this.getBufferStrategy();
+        if (bs == null) {
+            this.createBufferStrategy(3);
+            return;
+        }
+
+        Graphics g  = bs.getDrawGraphics();
+
+        g.setColor(Color.black);
+        g.fillRect(0, 0, WIDTH, HEIGHT);
+
+        g.dispose();
+        bs.show();
+    }
+
 
     public static void main(String[] args) {
         Game game = new Game(names);
         game.play();
-
-        /*
-        for (Player player : game.getPlayers()) {
-            Hand hand = player.getHand();
-            System.out.println(player.getName() + hand.getCards());
-        }
-        System.out.println(game.getDeck());
-        */
     }
 }
