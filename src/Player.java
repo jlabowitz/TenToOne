@@ -6,6 +6,7 @@ public abstract class Player {
     private int bet;
     private int score;
     private int trickScore;
+    protected ID id;
 
     public Player() {
         this(null);
@@ -42,6 +43,10 @@ public abstract class Player {
 
     public int getScore() {
         return score;
+    }
+
+    public ID getID() {
+        return id;
     }
 
     public void increaseScore(int n) {

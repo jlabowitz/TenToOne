@@ -3,6 +3,7 @@ import java.util.List;
 public class AI extends Player{
     AI(String name) {
         super(name);
+        id = ID.AI;
     }
 
     @Override

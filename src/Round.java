@@ -9,10 +9,16 @@ public class Round {
     private final Deck deck;
     private boolean trumpBroken;
 
-    public Round(int numCards, List<Player> players, int currentPlayer) {
+    private final int WIDTH, HEIGHT;
+    private final Handler handler;
+
+    public Round(int numCards, List<Player> players, int currentPlayer, int width, int height, Handler handler) {
         this.numCards = numCards;
         this.players = players;
         this.currentPlayer = currentPlayer;
+        WIDTH = width;
+        HEIGHT = height;
+        this.handler = handler;
 
         //deal
         deck = new Deck();
@@ -40,6 +46,8 @@ public class Round {
             //for each player
             int trickStartPlayer = currentPlayer;
 
+            renderPlayerHand();
+
             List<Card> cardsPlayed = playTrick(currentPlayer, trump);
 
             //determine winner of trick
@@ -49,6 +57,11 @@ public class Round {
             Player winner = getPlayer(actualWinner);
             winner.wonTrick();
             System.out.println(winner.getName() + " won the trick.");
+
+
+
+            //unrenderPlayerHand();
+            handler.removeAll();
 
             //winner of trick starts next round;
             currentPlayer = actualWinner;
@@ -75,16 +88,51 @@ public class Round {
 
         for (Player player : players) {
             if (player.getHand() == null) {
-                player.setHand(new Hand());
+                player.setHand(new Hand(WIDTH, HEIGHT, player.getID()));
             }
         }
     }
+
+    private void renderPlayerHand() {
+        Hand playersHand = getPlayer(0).getHand();
+        handler.addObject(playersHand);
+
+        for (Card card : playersHand.getCards()) {
+            handler.addObject(card);
+        }
+    }
+
+    private void unrenderPlayerHand() {
+        Hand playersHand = getPlayer(0).getHand();
+        handler.removeObject(playersHand);
+
+        for (Card card : playersHand.getCards()) {
+            handler.removeObject(card);
+        }
+    }
+
 
     private List<Card> playTrick(int currentPlayer, Suit trump) {
         List<Card> cardsPlayed = new ArrayList<>();
         Suit leading = null;
         for (int j = 0; j < numPlayers(); j++) {
             //play a card
+
+            /*
+            Hand currentHand = getPlayer(currentPlayer).getHand();
+            if (currentHand.getId() == ID.HUMAN) {
+                HANDLER.addObject(getPlayer(currentPlayer).getHand());
+
+                for (Card card : currentHand.getCards()) {
+                    HANDLER.addObject(card);
+                }
+
+            }
+
+             */
+
+
+
             Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
             if (!trumpBroken && card.getSuit() == trump) {
                 trumpBroken = true;

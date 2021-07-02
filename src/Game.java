@@ -42,9 +42,9 @@ public class Game extends Canvas implements Runnable{
 
     public Game(List<String> playerNames) {
         handler = new Handler();
-        //new Window(WIDTH, HEIGHT, "Ten to One", this);
+        new Window(WIDTH, HEIGHT, "Ten to One", this);
 
-        handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
+        //handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
 
         int numPlayers = playerNames.size();
         assert numPlayers <= 5 : "You cannot have more than 5 players";
@@ -56,7 +56,7 @@ public class Game extends Canvas implements Runnable{
         for (int i = 1; i < numPlayers; i++) {
             players.add(new AI(playerNames.get(i)));
         }
-        roundIndex = 8;
+        roundIndex = 0;
         Random r = new Random();
         roundStartingPlayer = r.nextInt(numPlayers);
     }
@@ -69,13 +69,15 @@ public class Game extends Canvas implements Runnable{
         //for each round
         while(roundIndex < 10) {
             int currentPlayer = roundStartingPlayer;
-            Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer);
+            Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
 
             //bet
             round.bet(currentPlayer);
 
             //play round
             round.playRound();
+
+            handler.removeAll();
 
             //adjust scores accordingly
             adjustScores();
@@ -170,7 +172,7 @@ public class Game extends Canvas implements Runnable{
             frames++;
             if (System.currentTimeMillis() - timer > 1000) {
                 timer += 1000;
-                System.out.println("FPS: " + frames);
+                //System.out.println("FPS: " + frames);
                 frames = 0;
             }
         }
@@ -190,7 +192,7 @@ public class Game extends Canvas implements Runnable{
 
         Graphics g  = bs.getDrawGraphics();
 
-        g.setColor(Color.black);
+        g.setColor(Color.white);
         g.fillRect(0, 0, WIDTH, HEIGHT);
 
         handler.render(g);

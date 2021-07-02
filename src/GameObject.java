@@ -5,6 +5,12 @@ public abstract class GameObject {
     protected int x, y;
     protected ID id;
 
+    public GameObject() {
+        this.x = 0;
+        this.y = 50;
+        id = null;
+    }
+
     public GameObject(int x, int y, ID id) {
         this.x = x;
         this.y = y;

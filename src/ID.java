@@ -1,3 +1,5 @@
 public enum ID {
-    CARD
+    CARD,
+    HUMAN,
+    AI
 }

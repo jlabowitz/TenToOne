@@ -1,16 +1,22 @@
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Hand {
+public class Hand extends GameObject{
     private List<Card> cards;
 
-    public Hand() {
+
+    public Hand(int width, int height, ID id) {
+        super(width, height, id);
         this.cards = new ArrayList<>();
     }
 
+    /*
     public Hand(List<Card> cards) {
         this.cards = cards;
     }
+
+     */
 
     public int getNumCards() {
         return cards.size();
@@ -68,5 +74,23 @@ public class Hand {
             }
         }
         return suitCards;
+    }
+
+    @Override
+    public void tick() {
+
+    }
+
+    @Override
+    public void render(Graphics g) {
+        int x = getX();
+        int y = getY();
+        int numCards = getNumCards();
+        if (this.id == ID.HUMAN) {
+            for (int i = 0; i < numCards; i++) {
+                cards.get(i).setX(x * i / numCards);
+                cards.get(i).setY(y - 150);
+            }
+        }
     }
 }

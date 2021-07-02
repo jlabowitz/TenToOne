@@ -1,11 +1,14 @@
+import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 
 public class Card extends GameObject {
     private final Suit suit;
     private final CardValue value;
 
     public Card(Suit suit, CardValue value) {
-        super(50, 50, ID.CARD);
         this.suit = suit;
         this.value = value;
     }
@@ -41,6 +44,17 @@ public class Card extends GameObject {
         } else {
             g.setColor(Color.black);
         }
+        String imgString = "img/" + value.getShortVal() + suit.getLetter() + ".png";
+
+
+        BufferedImage img = null;
+        try {
+            img = ImageIO.read(new File(imgString));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        g.drawImage(img, x, y, 60, 100, null);
         g.drawString(toString(), x, y);
     }
 }
