@@ -7,6 +7,7 @@ public class Hand {
     public Hand() {
         this.cards = new ArrayList<>();
     }
+
     public Hand(List<Card> cards) {
         this.cards = cards;
     }

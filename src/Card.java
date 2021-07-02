@@ -1,8 +1,8 @@
 import java.awt.*;
 
 public class Card extends GameObject {
-    private Suit suit;
-    private CardValue value;
+    private final Suit suit;
+    private final CardValue value;
 
     public Card(Suit suit, CardValue value) {
         super(50, 50, ID.CARD);

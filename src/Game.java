@@ -14,18 +14,16 @@ public class Game extends Canvas implements Runnable{
     public static final int WIDTH = 640, HEIGHT = WIDTH/12 * 9;
     private Thread thread;
     private boolean running = false;
-    private Handler handler;
+    private final Handler handler;
 
-    private Deck deck;
-    private List<Player> players;
-    private int round;
+    private final List<Player> players;
+    private int roundIndex;
     private int roundStartingPlayer;
-    private boolean trumpBroken;
     private final int roundBonus = 10;
 
-    private static List<String> names = new ArrayList<>() {{
-        add("Nava");
+    private static final List<String> names = new ArrayList<>() {{
         add("Jacob");
+        add("Player Two");
         add("Player Three");
         add("Player Four");
         add("Player Five");
@@ -54,146 +52,40 @@ public class Game extends Canvas implements Runnable{
 
         players = new ArrayList<>();
         players.add(new Human(playerNames.get(0)));
-        players.add(new Human(playerNames.get(1)));
-        for (int i = 2; i < numPlayers; i++) {
+        //players.add(new Human(playerNames.get(1)));
+        for (int i = 1; i < numPlayers; i++) {
             players.add(new AI(playerNames.get(i)));
         }
-        round = 5;
+        roundIndex = 8;
         Random r = new Random();
         roundStartingPlayer = r.nextInt(numPlayers);
     }
 
     private int numCardsThisRound() {
-        return 10 - round;
-    }
-
-    private void deal() {
-        for (Player player : players) {
-            String name = player.getName();
-            assert player.getHand() == null || player.getHand().getNumCards() == 0 : String.format("Player '%s' hand is not empty", name);
-        }
-        initializeHands();
-
-        int numCards = numCardsThisRound();
-
-        for (int i = 0; i < numCards; i++) {
-            for (Player player : players) {
-                Card card = deck.draw();
-                //Should not be using getter method to add card
-                player.getHand().addCard(card);
-            }
-        }
+        return 10 - roundIndex;
     }
 
     private void play() {
         //for each round
-        while(round < 10) {
-            //deal
-            boolean trumpBroken = false;
-            deck = new Deck();
-            deal();
-
-            //set trump suit
-            Suit trump = deck.draw().getSuit();
-            System.out.println("The trump suit is " + trump);
+        while(roundIndex < 10) {
+            int currentPlayer = roundStartingPlayer;
+            Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer);
 
             //bet
-            int currentPlayer = roundStartingPlayer;
-            bet(currentPlayer);
+            round.bet(currentPlayer);
 
             //play round
-            playRound(currentPlayer, trump);
+            round.playRound();
 
             //adjust scores accordingly
             adjustScores();
             printScores();
             roundStartingPlayer = nextPlayer(roundStartingPlayer);
-            round++;
+            this.roundIndex++;
         }
         //determine winner
         Player winner = determineWinner();
         System.out.println(winner.getName() + " won the game!");
-    }
-
-    private void bet(int currentPlayer) {
-        for (int i = 0; i < numPlayers(); i++) {
-            // choose a bet
-            getPlayer(currentPlayer).bet();
-            currentPlayer = nextPlayer(currentPlayer);
-        }
-    }
-
-    private void playRound(int currentPlayer, Suit trump) {
-        trumpBroken = false;
-        //for each trick
-        for (int i = 0; i < numCardsThisRound(); i++) {
-            //for each player
-            int trickStartPlayer = currentPlayer;
-
-            List<Card> cardsPlayed = playTrick(currentPlayer, trump);
-
-            //determine winner of trick
-            int winnerIndex = determineTrickWinner(cardsPlayed, trump);
-            int actualWinner = convertWinnerIndex(winnerIndex, trickStartPlayer);
-
-            Player winner = getPlayer(actualWinner);
-            winner.wonTrick();
-            System.out.println(winner.getName() + " won the trick.");
-
-            //winner of trick starts next round;
-            currentPlayer = actualWinner;
-        }
-    }
-
-    private List<Card> playTrick(int currentPlayer, Suit trump) {
-        List<Card> cardsPlayed = new ArrayList<>();
-        Suit leading = null;
-        for (int j = 0; j < numPlayers(); j++) {
-            //play a card
-            Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
-            if (!trumpBroken && card.getSuit() == trump) {
-                trumpBroken = true;
-            }
-            cardsPlayed.add(card);
-            if (j == 0) {
-                leading = cardsPlayed.get(0).getSuit();
-            }
-            currentPlayer = nextPlayer(currentPlayer);
-        }
-        return cardsPlayed;
-    }
-
-    static int determineTrickWinner(List<Card> cardsPlayed, Suit trump) {
-        int winner = 0;
-        Card winningCard = cardsPlayed.get(winner);
-        for (int i = 1; i < cardsPlayed.size(); i++) {
-            Card card = cardsPlayed.get(i);
-            if (isHigher(winningCard, card, trump)) {
-                winner = i;
-                winningCard = card;
-            }
-        }
-        return winner;
-    }
-
-    public int convertWinnerIndex(int winnerIndex, int trickStartPlayer) {
-        return (winnerIndex + trickStartPlayer) % numPlayers();
-    }
-
-    /// Returns true if CARD is higher values than WINNINGCARD
-    private static boolean isHigher(Card winningCard, Card card, Suit trump) {
-        Suit suit = card.getSuit();
-        if (suit != winningCard.getSuit()) {
-            if (suit == trump) {
-                return true;
-            } else {
-                return false;
-            }
-        } else if (card.getValue().compareTo(winningCard.getValue()) > 0) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     public void adjustScores() {
@@ -239,20 +131,7 @@ public class Game extends Canvas implements Runnable{
     }
 
     private int nextPlayer(int curr) {
-        int next = (curr + 1) % numPlayers();
-        return next;
-    }
-
-    public Deck getDeck() {
-        return deck;
-    }
-
-    private void initializeHands() {
-        for (Player player : players) {
-            if (player.getHand() == null) {
-                player.setHand(new Hand());
-            }
-        }
+        return (curr + 1) % numPlayers();
     }
 
     public synchronized void start() {

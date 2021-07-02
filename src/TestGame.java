@@ -16,7 +16,7 @@ public class TestGame {
         cardsPlayed.add(new Card(Suit.CLUBS, CardValue.THREE));
 
         Suit trump = Suit.HEARTS;
-        int actual = Game.determineTrickWinner(cardsPlayed, trump);
+        int actual = Round.determineTrickWinner(cardsPlayed, trump);
         assertEquals(0, actual);
     }
 }
