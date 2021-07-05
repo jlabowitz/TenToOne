@@ -32,11 +32,13 @@ public class Round {
     }
 
     public void bet(int currentPlayer) {
+        renderPlayerHand();
         for (int i = 0; i < numPlayers(); i++) {
             // choose a bet
             getPlayer(currentPlayer).bet();
             currentPlayer = nextPlayer(currentPlayer);
         }
+        handler.removeAll();
     }
 
     public void playRound() {
@@ -126,14 +128,21 @@ public class Round {
                 for (Card card : currentHand.getCards()) {
                     HANDLER.addObject(card);
                 }
-
             }
-
              */
 
-
-
             Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
+
+
+            Hand currentHand = getPlayer(currentPlayer).getHand();
+            if (currentHand.getId() == ID.AI) {
+                card.setX(WIDTH * j / (numPlayers() - 1));
+                card.setY(50);
+                handler.addObject(card);
+            }
+
+
+
             if (!trumpBroken && card.getSuit() == trump) {
                 trumpBroken = true;
             }
