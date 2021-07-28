@@ -50,7 +50,11 @@ public class Round {
 
             renderPlayerHand();
 
-            List<Card> cardsPlayed = playTrick(currentPlayer, trump);
+            Trick trick = new Trick(players, currentPlayer, trump, trumpBroken, WIDTH, HEIGHT, handler);
+            List<Card> cardsPlayed = trick.play();
+            if (!trumpBroken) {
+                trumpBroken = trick.getTrumpBroken();
+            }
 
             //determine winner of trick
             int winnerIndex = determineTrickWinner(cardsPlayed, trump);
@@ -113,52 +117,6 @@ public class Round {
         }
     }
 
-
-    private List<Card> playTrick(int currentPlayer, Suit trump) {
-        List<Card> cardsPlayed = new ArrayList<>();
-        Suit leading = null;
-        for (int j = 0; j < numPlayers(); j++) {
-            //play a card
-
-            /*
-            Hand currentHand = getPlayer(currentPlayer).getHand();
-            if (currentHand.getId() == ID.HUMAN) {
-                HANDLER.addObject(getPlayer(currentPlayer).getHand());
-
-                for (Card card : currentHand.getCards()) {
-                    HANDLER.addObject(card);
-                }
-            }
-             */
-
-            Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
-
-
-            //would be easier if trick was its own class first
-            //int cardIndex = convertCardIndex(j);
-
-
-            Player player = getPlayer(currentPlayer);
-            if (player.getID() == ID.AI) {
-                card.setX(WIDTH * j / (numPlayers() - 1));
-                card.setY(50);
-                handler.addObject(card);
-            }
-
-
-
-            if (!trumpBroken && card.getSuit() == trump) {
-                trumpBroken = true;
-            }
-            cardsPlayed.add(card);
-            if (j == 0) {
-                leading = cardsPlayed.get(0).getSuit();
-            }
-            currentPlayer = nextPlayer(currentPlayer);
-        }
-        getPlayer(0).nextTrick();
-        return cardsPlayed;
-    }
 
     static int determineTrickWinner(List<Card> cardsPlayed, Suit trump) {
         int winner = 0;

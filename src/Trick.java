@@ -2,72 +2,63 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Trick {
-    private final int numCards;
     private final List<Player> players;
-    private final int currentPlayer;
+    private int currentPlayer;
     private final Suit trump;
     private boolean trumpBroken;
+    private boolean humanHasGone;
 
     private final int WIDTH, HEIGHT;
     private final Handler handler;
 
 
-    public Trick(int numCards, List<Player> players, int currentPlayer, Suit trump, boolean trumpBroken, int width, int height, Handler handler) {
-        this.numCards = numCards;
+    public Trick(List<Player> players, int currentPlayer, Suit trump, boolean trumpBroken, int width, int height, Handler handler) {
         this.players = players;
         this.currentPlayer = currentPlayer;
         this.trump = trump;
         this.trumpBroken = trumpBroken;
+        this.humanHasGone = false;
         this.WIDTH = width;
         this.HEIGHT = height;
         this.handler = handler;
     }
 
-    private List<Card> playTrick(int currentPlayer, Suit trump) {
+    public List<Card> play() {
         List<Card> cardsPlayed = new ArrayList<>();
         Suit leading = null;
-        for (int j = 0; j < numPlayers(); j++) {
+        for (int i = 0; i < numPlayers(); i++) {
             //play a card
-
-            /*
-            Hand currentHand = getPlayer(currentPlayer).getHand();
-            if (currentHand.getId() == ID.HUMAN) {
-                HANDLER.addObject(getPlayer(currentPlayer).getHand());
-
-                for (Card card : currentHand.getCards()) {
-                    HANDLER.addObject(card);
-                }
-            }
-             */
 
             Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
 
-
-            //would be easier if trick was its own class first
-            //int cardIndex = convertCardIndex(j);
-
-
             Player player = getPlayer(currentPlayer);
+
+            if (player.getID() == ID.HUMAN) {
+                humanHasGone = true;
+            }
+
             if (player.getID() == ID.AI) {
-                card.setX(WIDTH * j / (numPlayers() - 1));
+                int cardIndex = convertCardIndex(i);
+                card.setX(WIDTH * cardIndex / (numPlayers() - 1));
                 card.setY(50);
                 handler.addObject(card);
             }
 
-
-
             if (!trumpBroken && card.getSuit() == trump) {
-                //TODO: NEED TO PASS THIS BOOLEAN OUT SOMEHOW (maybe make trump object?)
                 trumpBroken = true;
             }
             cardsPlayed.add(card);
-            if (j == 0) {
+            if (i == 0) {
                 leading = cardsPlayed.get(0).getSuit();
             }
             currentPlayer = nextPlayer(currentPlayer);
         }
         getPlayer(0).nextTrick();
         return cardsPlayed;
+    }
+
+    private int convertCardIndex(int i) {
+        return humanHasGone ? i - 1 : i;
     }
 
     //Improve
@@ -84,6 +75,12 @@ public class Trick {
     private int nextPlayer(int curr) {
         return (curr + 1) % numPlayers();
     }
+
+
+    public boolean getTrumpBroken() {
+        return trumpBroken;
+    }
+
 
 
 }

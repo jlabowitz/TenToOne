@@ -39,13 +39,14 @@ public class Card extends GameObject {
 
     @Override
     public void render(Graphics g) {
+        /*
         if (suit == Suit.DIAMONDS || suit == Suit.HEARTS) {
             g.setColor(Color.red);
         } else {
             g.setColor(Color.black);
         }
+        */
         String imgString = "img/" + value.getShortVal() + suit.getLetter() + ".png";
-
 
         BufferedImage img = null;
         try {
@@ -55,6 +56,6 @@ public class Card extends GameObject {
         }
 
         g.drawImage(img, x, y, 60, 100, null);
-        g.drawString(toString(), x, y);
+        //g.drawString(toString(), x, y);
     }
 }
