@@ -85,11 +85,11 @@ public class Hand extends GameObject{
     public void render(Graphics g) {
         int x = getX();
         int y = getY();
-        int numCards = getNumCards();
         if (this.id == ID.HUMAN) {
-            for (int i = 0; i < numCards; i++) {
-                cards.get(i).setX(x * i / numCards);
+            for (int i = 0; i < getNumCards(); i++) {
+                cards.get(i).setX(x * i / getNumCards());
                 cards.get(i).setY(y - 150);
+                cards.get(i).render(g);
             }
         }
     }

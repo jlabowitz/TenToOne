@@ -102,19 +102,11 @@ public class Round {
     private void renderPlayerHand() {
         Hand playersHand = getPlayer(0).getHand();
         handler.addObject(playersHand);
-
-        for (Card card : playersHand.getCards()) {
-            handler.addObject(card);
-        }
     }
 
     private void unrenderPlayerHand() {
         Hand playersHand = getPlayer(0).getHand();
         handler.removeObject(playersHand);
-
-        for (Card card : playersHand.getCards()) {
-            handler.removeObject(card);
-        }
     }
 
 

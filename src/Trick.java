@@ -29,9 +29,8 @@ public class Trick {
         for (int i = 0; i < numPlayers(); i++) {
             //play a card
 
-            Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
-
             Player player = getPlayer(currentPlayer);
+            Card card = player.playCard(cardsPlayed, leading, trump, trumpBroken);
 
             if (player.getID() == ID.HUMAN) {
                 humanHasGone = true;
@@ -41,8 +40,11 @@ public class Trick {
                 int cardIndex = convertCardIndex(i);
                 card.setX(WIDTH * cardIndex / (numPlayers() - 1));
                 card.setY(50);
-                handler.addObject(card);
+            } else {
+                card.setX((WIDTH - 100) / 2);
+                card.setY(HEIGHT - 300);
             }
+            handler.addObject(card);
 
             if (!trumpBroken && card.getSuit() == trump) {
                 trumpBroken = true;
@@ -76,11 +78,7 @@ public class Trick {
         return (curr + 1) % numPlayers();
     }
 
-
     public boolean getTrumpBroken() {
         return trumpBroken;
     }
-
-
-
 }
