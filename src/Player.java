@@ -67,6 +67,10 @@ public abstract class Player {
 
     public abstract Card playCard(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken);
 
+    public void nextTrick() {
+
+    }
+
     //Method could be made static or put in another file
     public List<Card> legalCards(List<Card> cardsPlayed, Suit leading, Suit trump, boolean trumpBroken) {
         Hand hand = getHand();

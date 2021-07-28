@@ -36,6 +36,13 @@ public class Human extends Player{
         return played;
     }
 
+    @Override
+    public void nextTrick() {
+        Scanner playerInput = new Scanner(System.in);
+        System.out.println("Hit any key to move on to the next trick.");
+        playerInput.next();
+    }
+
     public boolean checkIndex(int cardIndex, Hand hand) {
         return 0 <= cardIndex && cardIndex < hand.getNumCards();
     }

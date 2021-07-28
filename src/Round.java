@@ -134,8 +134,12 @@ public class Round {
             Card card = getPlayer(currentPlayer).playCard(cardsPlayed, leading, trump, trumpBroken);
 
 
-            Hand currentHand = getPlayer(currentPlayer).getHand();
-            if (currentHand.getId() == ID.AI) {
+            //would be easier if trick was its own class first
+            //int cardIndex = convertCardIndex(j);
+
+
+            Player player = getPlayer(currentPlayer);
+            if (player.getID() == ID.AI) {
                 card.setX(WIDTH * j / (numPlayers() - 1));
                 card.setY(50);
                 handler.addObject(card);
@@ -152,6 +156,7 @@ public class Round {
             }
             currentPlayer = nextPlayer(currentPlayer);
         }
+        getPlayer(0).nextTrick();
         return cardsPlayed;
     }
 
