@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.util.List;
 import java.util.LinkedList;
 
 public class Handler {
@@ -22,11 +23,19 @@ public class Handler {
         this.object.add(object);
     }
 
+    public void addAll(List<? extends GameObject> objects) {
+        for (GameObject object : objects) {
+            addObject(object);
+        }
+    }
+
     public void removeObject(GameObject object) {
         this.object.remove(object);
     }
 
-    public void removeAll() {
-        object = new LinkedList<>();
+    public void removeAll(List<? extends GameObject> objects) {
+        for (GameObject object : objects) {
+            removeObject(object);
+        }
     }
 }

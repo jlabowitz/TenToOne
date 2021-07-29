@@ -6,7 +6,6 @@ public class Trick {
     private int currentPlayer;
     private final Suit trump;
     private boolean trumpBroken;
-    private boolean humanHasGone;
 
     private final int WIDTH, HEIGHT;
     private final Handler handler;
@@ -17,7 +16,6 @@ public class Trick {
         this.currentPlayer = currentPlayer;
         this.trump = trump;
         this.trumpBroken = trumpBroken;
-        this.humanHasGone = false;
         this.WIDTH = width;
         this.HEIGHT = height;
         this.handler = handler;
@@ -32,14 +30,9 @@ public class Trick {
             Player player = getPlayer(currentPlayer);
             Card card = player.playCard(cardsPlayed, leading, trump, trumpBroken);
 
-            if (player.getID() == ID.HUMAN) {
-                humanHasGone = true;
-            }
-
             if (player.getID() == ID.AI) {
-                int cardIndex = convertCardIndex(i);
-                card.setX(WIDTH * cardIndex / (numPlayers() - 1));
-                card.setY(50);
+                card.setX(player.getX());
+                card.setY(player.getY() + 20);
             } else {
                 card.setX((WIDTH - 100) / 2);
                 card.setY(HEIGHT - 300);
@@ -57,10 +50,6 @@ public class Trick {
         }
         getPlayer(0).nextTrick();
         return cardsPlayed;
-    }
-
-    private int convertCardIndex(int i) {
-        return humanHasGone ? i - 1 : i;
     }
 
     //Improve

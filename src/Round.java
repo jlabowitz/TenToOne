@@ -37,7 +37,6 @@ public class Round {
             getPlayer(currentPlayer).bet(trump);
             currentPlayer = nextPlayer(currentPlayer);
         }
-        handler.removeAll();
     }
 
     public void playRound() {
@@ -46,8 +45,6 @@ public class Round {
         for (int i = 0; i < numCards; i++) {
             //for each player
             int trickStartPlayer = currentPlayer;
-
-            renderPlayerHand();
 
             Trick trick = new Trick(players, currentPlayer, trump, trumpBroken, WIDTH, HEIGHT, handler);
             List<Card> cardsPlayed = trick.play();
@@ -63,8 +60,7 @@ public class Round {
             winner.wonTrick();
             System.out.println(winner.getName() + " won the trick.");
 
-            //unrenderPlayerHand();
-            handler.removeAll();
+            handler.removeAll(cardsPlayed);
 
             //winner of trick starts next round;
             currentPlayer = actualWinner;
@@ -100,12 +96,6 @@ public class Round {
         Hand playersHand = getPlayer(0).getHand();
         handler.addObject(playersHand);
     }
-
-    private void unrenderPlayerHand() {
-        Hand playersHand = getPlayer(0).getHand();
-        handler.removeObject(playersHand);
-    }
-
 
     static int determineTrickWinner(List<Card> cardsPlayed, Suit trump) {
         int winner = 0;

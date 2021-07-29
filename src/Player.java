@@ -1,6 +1,7 @@
+import java.awt.*;
 import java.util.List;
 
-public abstract class Player {
+public abstract class Player extends GameObject{
     private String name;
     private Hand hand;
     private int bet;
@@ -17,6 +18,7 @@ public abstract class Player {
         this.hand = null;
         this.score = 0;
         this.trickScore = 0;
+        this.bet = 0;
     }
 
     public String getName() {
@@ -91,6 +93,21 @@ public abstract class Player {
             } else {
                 return hand.getCards();
             }
+        }
+    }
+
+    @Override
+    public void tick() {
+
+    }
+
+    @Override
+    public void render(Graphics g) {
+        if (id.equals(ID.AI)) {
+            g.setColor(Color.BLACK);
+            g.drawString(getName(), getX(), getY());
+            g.drawString(getTrickScore() + "/" + getBet(), getX(), getY() + 150);
+            g.drawString("Score: " + getScore(), getX(), getY() + 170);
         }
     }
 }

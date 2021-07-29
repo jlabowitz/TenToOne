@@ -51,9 +51,9 @@ public class Game extends Canvas implements Runnable{
 
 
         players = new ArrayList<>();
-        //players.add(new Human(playerNames.get(0)));
+        players.add(new Human(playerNames.get(0)));
         //players.add(new Human(playerNames.get(1)));
-        for (int i = 0; i < numPlayers; i++) {
+        for (int i = 1; i < numPlayers; i++) {
             players.add(new AI_Easy(playerNames.get(i)));
         }
         roundIndex = 0;
@@ -66,6 +66,7 @@ public class Game extends Canvas implements Runnable{
     }
 
     private void play() {
+        renderPlayers();
         //for each round
         while(roundIndex < 10) {
             int currentPlayer = roundStartingPlayer;
@@ -77,7 +78,7 @@ public class Game extends Canvas implements Runnable{
             //play round
             round.playRound();
 
-            handler.removeAll();
+            //handler.removeAll();
 
             //adjust scores accordingly
             adjustScores();
@@ -177,6 +178,19 @@ public class Game extends Canvas implements Runnable{
             }
         }
         stop();
+    }
+
+    public void renderPlayers() {
+        for (int i = 0; i < players.size(); i++) {
+            Player player = players.get(i);
+            if (player.getID() == ID.AI) {
+                int x = (WIDTH * (i - 1)) / (numPlayers() - 1);
+                int y = 50;
+                player.setX(x);
+                player.setY(y);
+                handler.addObject(player);
+            }
+        }
     }
 
     private void tick() {
