@@ -1,4 +1,3 @@
-import java.util.ArrayList;
 import java.util.List;
 
 public class Round {
@@ -124,7 +123,7 @@ public class Round {
     }
 
     /// Returns true if CARD is higher values than WINNINGCARD
-    private static boolean isHigher(Card winningCard, Card card, Suit trump) {
+    static boolean isHigher(Card winningCard, Card card, Suit trump) {
         Suit suit = card.getSuit();
         if (suit != winningCard.getSuit()) {
             return suit == trump;

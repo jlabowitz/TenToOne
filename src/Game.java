@@ -54,7 +54,7 @@ public class Game extends Canvas implements Runnable{
         players.add(new Human(playerNames.get(0)));
         //players.add(new Human(playerNames.get(1)));
         for (int i = 1; i < numPlayers; i++) {
-            players.add(new AI(playerNames.get(i)));
+            players.add(new AI_Easy(playerNames.get(i)));
         }
         roundIndex = 0;
         Random r = new Random();
