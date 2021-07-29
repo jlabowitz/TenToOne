@@ -10,7 +10,7 @@ public class Human extends Player{
 
 
     @Override
-    public void bet() {
+    public void bet(Suit trump) {
         Scanner playerInput = new Scanner(System.in);
         System.out.println(getHand());
         System.out.println(getName() + ", what do you want to bet?");

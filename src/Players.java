@@ -14,6 +14,6 @@ public class Players {
     }
 
     public void addAI() {
-        players.add(new AI("Player " + (players.size() + 1)));
+        players.add(new AI_Easy("Player " + (players.size() + 1)));
     }
 }

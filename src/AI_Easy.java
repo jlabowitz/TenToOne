@@ -2,8 +2,31 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AI_Easy extends AI{
+    private final int NUM_HIGH_TRUMP = 6;
+    private final int NUM_HIGH_CARDS = 2;
+    private final double HIGH_TRUMP_PERCENT = 1;
+    private final double HIGH_CARDS_PERCENT = 1;
+
     public AI_Easy(String name) {
         super(name);
+    }
+
+    @Override
+    public void bet(Suit trump) {
+        Hand hand = getHand();
+        int numHighTrump = countTopValues(hand.getCardsOfSuit(trump), (int) (NUM_HIGH_TRUMP * numCardsFactor()));
+        int numHighCards = countTopValues(hand.getCardsNotOfSuit(trump), (int) (NUM_HIGH_CARDS * numCardsFactor()));
+
+        int bet = (int) (numHighTrump * HIGH_TRUMP_PERCENT + numHighCards * HIGH_CARDS_PERCENT);
+
+        setBet(bet);
+        System.out.println(getName() + " bets " + bet);
+    }
+
+    private double numCardsFactor() {
+        int numCards = getHand().getNumCards();
+        //if numCards is higher, then the factor should be lower
+        return (-1.0 / 9) * numCards + 19.0 / 9;
     }
 
     //Tries to lose if their trickScore is equal to their bet, win otherwise
@@ -12,126 +35,55 @@ public class AI_Easy extends AI{
         int bet = getBet();
         int trickScore = getTrickScore();
         List<Card> legalCards = legalCards(cardsPlayed, leading, trump, trumpBroken);
-
         if (trickScore == bet) {
-            // try to lose
+            return tryToLose(cardsPlayed, legalCards, trump);
+        } else {
+            return tryToWin(cardsPlayed, legalCards, trump);
+        }
+    }
 
-            if (cardsPlayed.isEmpty()) {
-                //if not all cards are trump, remove trump cards
-                if (countSuit(legalCards, trump) != legalCards.size()) {
-                    List<Card> legalNoTrump = new ArrayList<>();
-                    for (Card card : legalCards) {
-                        if (!card.getSuit().equals(trump)) {
-                            legalNoTrump.add(card);
-                        }
+    public Card tryToLose(List<Card> cardsPlayed, List<Card> legalCards, Suit trump) {
+        if (cardsPlayed.isEmpty()) {
+            //if not all cards are trump, remove trump cards
+            //consider removing this if statement
+            if (countSuit(legalCards, trump) != legalCards.size()) {
+                List<Card> legalNoTrump = new ArrayList<>();
+                for (Card card : legalCards) {
+                    if (!card.getSuit().equals(trump)) {
+                        legalNoTrump.add(card);
                     }
-                    return findLowest(legalNoTrump);
                 }
-                return findLowest(legalCards);
+                return getLowestValue(legalNoTrump);
             }
+            return getLowestValue(legalCards);
+        }
 
-            Card highest = cardsPlayed.get(Round.determineTrickWinner(cardsPlayed, trump));
+        Card highest = cardsPlayed.get(Round.determineTrickWinner(cardsPlayed, trump));
+        List<Card> losers = getLosingCards(highest, legalCards, trump);
 
-            List<Card> losers = findLose(highest, legalCards, trump);
-
-            //if nothing in losers
-            if (losers.isEmpty()) {
-                //try to win by smallest possible margin
-                return findLowest(legalCards);
-
-            } else {
-                //play highest card that will lose
-                return findHighest(losers);
-
-            }
+        if (losers.isEmpty()) {
+            //try to win by smallest possible margin
+            return getLowestValue(legalCards);
 
         } else {
-            if (cardsPlayed.isEmpty()) {
-                //TODO: this could be smarter (either purposely select trump or not)
-                return findHighest(legalCards);
-            }
-
-            Card highest = cardsPlayed.get(Round.determineTrickWinner(cardsPlayed, trump));
-            //try to win, unless something higher has already been played
-            List<Card> winners = findWin(highest, legalCards, trump);
-
-            //if nothing in winners
-            if (winners.isEmpty()) {
-                //play lowest card
-
-                return findLowest(legalCards);
-            } else {
-                //play highest card
-                return findHighest(winners);
-            }
+            //play highest card that will lose
+            return getHighestValue(losers);
         }
     }
 
-
-    /*** Get all cards that will win ***/
-    public List<Card> findLose(Card highest, List<Card> legalCards, Suit trump) {
-        List<Card> losers = new ArrayList<>();
-        for (Card card : legalCards) {
-            if (!Round.isHigher(highest, card, trump)) {
-                losers.add(card);
-            }
+    public Card tryToWin(List<Card> cardsPlayed, List<Card> legalCards, Suit trump) {
+        if (cardsPlayed.isEmpty()) {
+            //TODO: this could be smarter (either purposely select trump or not)
+            return getHighestValue(legalCards);
         }
-        return losers;
-    }
+        Card highest = cardsPlayed.get(Round.determineTrickWinner(cardsPlayed, trump));
+        List<Card> winners = getWinningCards(highest, legalCards, trump);
 
-    /*** Get all cards that will win ***/
-    public List<Card> findWin(Card highest, List<Card> legalCards, Suit trump) {
-        List<Card> winners = new ArrayList<>();
-        for (Card card : legalCards) {
-            if (Round.isHigher(highest, card, trump)) {
-                winners.add(card);
-            }
+        if (winners.isEmpty()) {
+            //try to lose by largest possible margin
+            return getLowestValue(legalCards);
+        } else {
+            return getHighestValue(winners);
         }
-        return winners;
     }
-
-
-    public Card findLowest(List<Card> cards) {
-        /*//Don't remove all cards if they only have trump left
-        if (countSuit(cards, trump) != cards.size()) {
-            for (Card card: cards) {
-                if (card.getSuit().equals(trump)) {
-                    cards.remove(card);
-                }
-            }
-        }*/
-
-        Card lowest = cards.get(0);
-        for (Card card : cards) {
-            if (card.getValue().compareTo(lowest.getValue()) < 0) {
-                lowest = card;
-            }
-        }
-        return lowest;
-    }
-
-
-    public Card findHighest(List<Card> cards) {
-        Card highest = cards.get(0);
-        for (Card card : cards) {
-            if (card.getValue().compareTo(highest.getValue()) > 0) {
-                highest = card;
-            }
-        }
-        return highest;
-    }
-
-
-
-
-    public int countSuit(List<Card> cards, Suit suit) {
-        int count = 0;
-        for (Card card : cards) {
-            if (card.getSuit().equals(suit)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
 }

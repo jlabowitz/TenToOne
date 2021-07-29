@@ -34,7 +34,7 @@ public class Round {
         renderPlayerHand();
         for (int i = 0; i < numPlayers(); i++) {
             // choose a bet
-            getPlayer(currentPlayer).bet();
+            getPlayer(currentPlayer).bet(trump);
             currentPlayer = nextPlayer(currentPlayer);
         }
         handler.removeAll();
@@ -62,8 +62,6 @@ public class Round {
             Player winner = getPlayer(actualWinner);
             winner.wonTrick();
             System.out.println(winner.getName() + " won the trick.");
-
-
 
             //unrenderPlayerHand();
             handler.removeAll();

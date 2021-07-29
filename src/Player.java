@@ -39,7 +39,7 @@ public abstract class Player {
         this.bet = bet;
     }
 
-    public abstract void bet();
+    public abstract void bet(Suit trump);
 
     public int getScore() {
         return score;
