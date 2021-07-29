@@ -47,7 +47,7 @@ public class AI_Easy extends AI{
 
         } else {
             if (cardsPlayed.isEmpty()) {
-                //TODO: this could be smarter (either purposely select trump or not
+                //TODO: this could be smarter (either purposely select trump or not)
                 return findHighest(legalCards);
             }
 
