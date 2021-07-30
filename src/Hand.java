@@ -26,8 +26,22 @@ public class Hand extends GameObject{
         return cards;
     }
 
-    public void addCard(Card card) {
-        cards.add(card);
+    /** Sorts card on insertion **/
+    public void addCard(Card newCard) {
+        for (int i = 0; i < cards.size(); i++) {
+            Card card = cards.get(i);
+            if (newCard.getSuit() == card.getSuit()) {
+                if (newCard.getValue().compareTo(card.getValue()) < 0) {
+                    cards.add(i, newCard);
+                    return;
+                }
+            }
+            else if (newCard.getSuit().compareTo(card.getSuit()) < 0) {
+                cards.add(i, newCard);
+                return;
+            }
+        }
+        cards.add(newCard);
     }
 
     public Card getCard(int index) {
