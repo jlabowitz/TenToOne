@@ -4,6 +4,7 @@ public class Round {
     private final int numCards;
     private final List<Player> players;
     private int currentPlayer;
+    private final Card trumpCard;
     private final Suit trump;
     private final Deck deck;
     private boolean trumpBroken;
@@ -24,13 +25,15 @@ public class Round {
         deal();
 
         //set trump suit
-        this.trump = deck.draw().getSuit();
+        this.trumpCard = deck.draw();
+        this.trump = trumpCard.getSuit();
         System.out.println("The trump suit is " + trump);
 
         trumpBroken = false;
     }
 
     public void bet(int currentPlayer) {
+        renderTrumpCard();
         renderPlayerHand();
         for (int i = 0; i < numPlayers(); i++) {
             // choose a bet
@@ -90,6 +93,13 @@ public class Round {
                 player.setHand(new Hand(WIDTH, HEIGHT, player.getID()));
             }
         }
+    }
+
+    private void renderTrumpCard() {
+        trumpCard.setX(50);
+        trumpCard.setY(HEIGHT / 2);
+        trumpCard.setTrump();
+        handler.addObject(trumpCard);
     }
 
     private void renderPlayerHand() {

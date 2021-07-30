@@ -7,10 +7,12 @@ import java.io.IOException;
 public class Card extends GameObject {
     private final Suit suit;
     private final CardValue value;
+    private boolean trump;
 
     public Card(Suit suit, CardValue value) {
         this.suit = suit;
         this.value = value;
+        this.trump = false;
     }
 
     public Suit getSuit() {
@@ -19,6 +21,10 @@ public class Card extends GameObject {
 
     public CardValue getValue() {
         return value;
+    }
+
+    public void setTrump() {
+        trump = true;
     }
 
     @Override
@@ -57,5 +63,9 @@ public class Card extends GameObject {
 
         g.drawImage(img, x, y, 60, 100, null);
         //g.drawString(toString(), x, y);
+        g.setColor(Color.black);
+        if (trump) {
+            g.drawRect(x - 10,  y - 10, 80, 120);
+        }
     }
 }
