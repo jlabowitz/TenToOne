@@ -5,18 +5,10 @@ import java.util.List;
 public class Hand extends GameObject{
     private List<Card> cards;
 
-
     public Hand(int width, int height, ID id) {
         super(width, height, id);
         this.cards = new ArrayList<>();
     }
-
-    /*
-    public Hand(List<Card> cards) {
-        this.cards = cards;
-    }
-
-     */
 
     public int getNumCards() {
         return cards.size();
@@ -102,7 +94,7 @@ public class Hand extends GameObject{
         if (this.id == ID.HUMAN) {
             for (int i = 0; i < getNumCards(); i++) {
                 cards.get(i).setX(x * i / getNumCards());
-                cards.get(i).setY(y - 150);
+                cards.get(i).setY(y);
                 cards.get(i).render(g);
             }
         }

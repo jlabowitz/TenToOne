@@ -9,9 +9,9 @@ public abstract class Player extends GameObject{
     private int trickScore;
     protected ID id;
 
-    public Player() {
+    /*public Player() {
         this(null);
-    }
+    }*/
 
     public Player(String name) {
         this.name = name;
@@ -103,11 +103,16 @@ public abstract class Player extends GameObject{
 
     @Override
     public void render(Graphics g) {
-        if (id.equals(ID.AI)) {
+        if (id == ID.AI) {
             g.setColor(Color.BLACK);
             g.drawString(getName(), getX(), getY());
             g.drawString(getTrickScore() + "/" + getBet(), getX(), getY() + 150);
             g.drawString("Score: " + getScore(), getX(), getY() + 170);
+        }
+        else if (id == ID.HUMAN) {
+            Hand hand = getHand();
+            hand.setY(getY());
+            getHand().render(g);
         }
     }
 }

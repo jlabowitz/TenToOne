@@ -190,6 +190,13 @@ public class Game extends Canvas implements Runnable{
                 player.setY(y);
                 handler.addObject(player);
             }
+            else if (player.getID() == ID.HUMAN) {
+                int x = WIDTH;
+                int y = HEIGHT - 150;
+                player.setX(x);
+                player.setY(y);
+                handler.addObject(player);
+            }
         }
     }
 
