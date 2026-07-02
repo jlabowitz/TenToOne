@@ -8,6 +8,8 @@ public class Card extends GameObject {
     /** Rendered card size in pixels; also used for click hit-testing. */
     public static final int WIDTH = 60;
     public static final int HEIGHT = 100;
+    /** Padding on each side of a card for the trump highlight border. */
+    private static final int BORDER = 10;
 
     private final Suit suit;
     private final CardValue value;
@@ -69,7 +71,7 @@ public class Card extends GameObject {
         //g.drawString(toString(), x, y);
         g.setColor(Color.black);
         if (trump) {
-            g.drawRect(x - 10,  y - 10, 80, 120);
+            g.drawRect(x - BORDER, y - BORDER, WIDTH + 2 * BORDER, HEIGHT + 2 * BORDER);
         }
     }
 }

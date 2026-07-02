@@ -1,0 +1,4 @@
+# Compiled output
+build/
+out/
+*.class
