@@ -82,6 +82,38 @@ public class Hand extends GameObject{
         return suitCards;
     }
 
+    /**
+     * Positions each card from this hand's current x/y and the card's index,
+     * exactly as render draws them. Card i sits at x = handX * i / numCards,
+     * y = handY, and covers the half-open pixel ranges [x, x + Card.WIDTH)
+     * by [y, y + Card.HEIGHT).
+     */
+    private void layoutCards() {
+        int numCards = getNumCards();
+        for (int i = 0; i < numCards; i++) {
+            Card card = cards.get(i);
+            card.setX(getX() * i / numCards);
+            card.setY(getY());
+        }
+    }
+
+    /**
+     * Returns the card of this hand at pixel (px, py), or null if the point
+     * hits no card. Uses the same layout as render. Iterates from the last
+     * card backwards so the topmost-drawn card wins if cards ever overlap.
+     */
+    public Card cardAt(int px, int py) {
+        layoutCards();
+        for (int i = getNumCards() - 1; i >= 0; i--) {
+            Card card = cards.get(i);
+            if (px >= card.getX() && px < card.getX() + Card.WIDTH
+                    && py >= card.getY() && py < card.getY() + Card.HEIGHT) {
+                return card;
+            }
+        }
+        return null;
+    }
+
     @Override
     public void tick() {
 
@@ -89,12 +121,9 @@ public class Hand extends GameObject{
 
     @Override
     public void render(Graphics g) {
-        int x = getX();
-        int y = getY();
         if (this.id == ID.HUMAN) {
+            layoutCards();
             for (int i = 0; i < getNumCards(); i++) {
-                cards.get(i).setX(x * i / getNumCards());
-                cards.get(i).setY(y);
                 cards.get(i).render(g);
             }
         }

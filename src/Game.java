@@ -42,6 +42,8 @@ public class Game extends Canvas implements Runnable{
 
     public Game(List<String> playerNames) {
         handler = new Handler();
+        MouseInput mouseInput = new MouseInput();
+        this.addMouseListener(mouseInput);
         new Window(WIDTH, HEIGHT, "Ten to One", this);
 
         //handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
@@ -51,8 +53,8 @@ public class Game extends Canvas implements Runnable{
 
 
         players = new ArrayList<>();
-        players.add(new Human(playerNames.get(0)));
-        //players.add(new Human(playerNames.get(1)));
+        players.add(new Human(playerNames.get(0), mouseInput));
+        //players.add(new Human(playerNames.get(1), mouseInput));
         for (int i = 1; i < numPlayers; i++) {
             players.add(new AI_Easy(playerNames.get(i)));
         }

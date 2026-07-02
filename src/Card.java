@@ -5,6 +5,10 @@ import java.io.File;
 import java.io.IOException;
 
 public class Card extends GameObject {
+    /** Rendered card size in pixels; also used for click hit-testing. */
+    public static final int WIDTH = 60;
+    public static final int HEIGHT = 100;
+
     private final Suit suit;
     private final CardValue value;
     private boolean trump;
@@ -61,7 +65,7 @@ public class Card extends GameObject {
             e.printStackTrace();
         }
 
-        g.drawImage(img, x, y, 60, 100, null);
+        g.drawImage(img, x, y, WIDTH, HEIGHT, null);
         //g.drawString(toString(), x, y);
         g.setColor(Color.black);
         if (trump) {

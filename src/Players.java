@@ -9,8 +9,8 @@ public class Players {
         players = new ArrayList<>();
     }
 
-    public void addHuman(String name) {
-        players.add(new Human(name));
+    public void addHuman(String name, MouseInput mouseInput) {
+        players.add(new Human(name, mouseInput));
     }
 
     public void addAI() {

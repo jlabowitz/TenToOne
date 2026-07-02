@@ -92,6 +92,17 @@ public class Round {
             if (player.getHand() == null) {
                 player.setHand(new Hand(WIDTH, HEIGHT, player.getID()));
             }
+            if (player.getID() == ID.HUMAN) {
+                //Position the hand here, on the game-logic thread, so cardAt
+                //hit-tests the on-screen position before any click is awaited.
+                //Game.renderPlayers has already placed the human player at
+                //(WIDTH, HEIGHT - 150) on this thread; Player.render's
+                //hand.setY(getY()) on the render thread then re-writes the
+                //same value, which is benign.
+                Hand hand = player.getHand();
+                hand.setX(player.getX());
+                hand.setY(player.getY());
+            }
         }
     }
 
