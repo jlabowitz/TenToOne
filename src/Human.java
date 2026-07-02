@@ -1,14 +1,14 @@
 import java.awt.Point;
 import java.util.List;
-import java.util.Scanner;
 
 public class Human extends Player{
     private final MouseInput mouseInput;
-    private final Scanner playerInput = new Scanner(System.in);
+    private final Handler handler;
 
-    public Human(String name, MouseInput mouseInput) {
+    public Human(String name, MouseInput mouseInput, Handler handler) {
         super(name);
         this.mouseInput = mouseInput;
+        this.handler = handler;
         id = ID.HUMAN;
     }
 
@@ -17,23 +17,35 @@ public class Human extends Player{
     public void bet(Suit trump) {
         int maxBet = getHand().getNumCards();
         System.out.println(getHand());
-        System.out.println(getName() + ", what do you want to bet? (0-" + maxBet + ")");
+        System.out.println(getName() + ", click the stepper to choose your bet (0-" + maxBet + "), then click Bet.");
 
-        while (true) {
-            if (!playerInput.hasNextInt()) {
-                playerInput.next();
-                System.out.println("Please enter a whole number between 0 and " + maxBet + ".");
-                continue;
+        BetStepper stepper = new BetStepper(maxBet);
+        handler.addObject(stepper);
+        mouseInput.clearClicks();
+        try {
+            while (true) {
+                Point click = mouseInput.awaitClick();
+                BetStepper.Control control = stepper.controlAt(click.x, click.y);
+                if (control == null) {
+                    continue;
+                }
+                switch (control) {
+                    case DECREMENT:
+                        stepper.decrement();
+                        continue;
+                    case INCREMENT:
+                        stepper.increment();
+                        continue;
+                    case BET:
+                        if (isValidBet(stepper.getValue(), maxBet)) {
+                            setBet(stepper.getValue());
+                            return;
+                        }
+                        continue;
+                }
             }
-
-            int bet = playerInput.nextInt();
-            if (!isValidBet(bet, maxBet)) {
-                System.out.println("Bet must be between 0 and " + maxBet + ".");
-                continue;
-            }
-
-            setBet(bet);
-            return;
+        } finally {
+            handler.removeObject(stepper);
         }
     }
 

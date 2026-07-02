@@ -35,6 +35,9 @@ public class Round {
     public void bet(int currentPlayer) {
         renderTrumpCard();
         renderPlayerHand();
+        for (Player player : players) {
+            player.resetBet();
+        }
         for (int i = 0; i < numPlayers(); i++) {
             // choose a bet
             getPlayer(currentPlayer).bet(trump);

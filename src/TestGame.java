@@ -29,7 +29,7 @@ public class TestGame {
      */
     @Test
     public void dealtHumanHandUsesPlayersOnScreenPosition() {
-        Human human = new Human("You", new MouseInput());
+        Human human = new Human("You", new MouseInput(), new Handler());
         //Game.renderPlayers positions the human at (WIDTH, HEIGHT - 150)
         //on the game-logic thread before any Round is constructed
         human.setX(Game.WIDTH);
@@ -48,7 +48,7 @@ public class TestGame {
     /** The hand persists between rounds, so every round must re-position it. */
     @Test
     public void redealtHumanHandIsRepositionedEachRound() {
-        Human human = new Human("You", new MouseInput());
+        Human human = new Human("You", new MouseInput(), new Handler());
         human.setX(Game.WIDTH);
         human.setY(Game.HEIGHT - 150);
 

@@ -39,7 +39,8 @@ without popping a window during test runs. Commit `83e0660`, pushed.
 crashing on non-numeric input or accepting out-of-range values. Commit
 `f2629e9`, pushed.
 
-### 5. Mouse-driven betting + persistent bet/score display — `ready` — M — `game-designer` spec → `senior-frontend-developer`
+### 5. Mouse-driven betting + persistent bet/score display — `done` — M — `game-designer` spec → `senior-frontend-developer`
+Implementation complete 2026-07-02 (`BetStepper`, `Human`/`Player`/`Round`/`Game` wiring, `TestBetStepper.java`) but **not yet committed** — commit hash to be added here in a follow-up housekeeping edit after the commit lands.
 Two parts, scoped together since both concern the human's on-screen UI real
 estate: (a) clickable bet buttons (0..numCards), replacing the last
 remaining console input during play; (b) persistent on-screen display of the
@@ -74,6 +75,40 @@ human's own bet/score readout and the bet-input buttons go relative to the
 hand needs an actual design call, not an assumption. Scope the
 `game-designer` pass to exactly two decisions: (a) bet-input button layout,
 and (b) live bet+score display placement for the human player.
+
+**Design approved 2026-07-02** -- spec from `game-designer`, revised once
+after user feedback rejected an initial 11-button row as cluttered:
+- (a) Numeric stepper, not discrete buttons: a single horizontal row
+  `[ − ][ value ][ + ][ Bet ]` anchored at x=620 (same x as the HUD, so the
+  two read as one right-side info/control column), y=585-619, 180px total
+  width. Decrement/increment adjust the draft value by 1, clamped
+  (inert no-op at 0 or numCards, not wraparound). "Bet" commits, reusing the
+  existing `Human.isValidBet` predicate as a defensive check. Implement as
+  one composite `GameObject` ("BetStepper") owning the draft value and a
+  single hit-test method (returns which sub-control was hit), added to
+  `Handler` on entry to `Human.bet()` and removed on return, matching
+  `Human.playCard`'s existing lifecycle pattern. Fixed x position (unlike
+  the rejected spec's per-round-centered row) means the control's screen
+  location doesn't shift between rounds. Hover feedback and press-and-hold
+  auto-repeat on the arrows are both deferred -- no `MouseMotionListener` or
+  repeat-timer capability exists in the codebase today, and the range is
+  small enough (at most 10 discrete clicks) that the UX cost is low.
+  Needs its own `TestBetStepper.java` (pure hit-test geometry, no window),
+  mirroring `TestHand.java`'s convention.
+- (b) HUD: fixed text position at x=620, three lines at y=430/448/466 (the
+  AI branch's `(getX(), getY())` anchor can't be reused -- human `Player`'s
+  stored coords are the hand's layout anchor, x=840 is off-canvas). Same
+  content format as the AI HUD: `trickScore/bet`, `Score: N`. Disjoint
+  y-band from the stepper (HUD ~y=420-470, stepper y=585-619) -- no overlap.
+  Note (not a defect, no fix needed): while the stepper is mid-adjustment
+  pre-submit, the HUD still shows the last *committed* bet, not the
+  in-progress draft value -- the stepper's own value display already shows
+  the draft number, so this is expected, not stale data.
+- (c) Bundled fix: `Player.bet` is never reset between rounds today (only
+  `trickScore` gets a per-round reset via `resetTrickScore()`) -- without a
+  fix the new HUD would show last round's bet as already-placed before the
+  human bets this round. Includes a small state addition (e.g. a `hasBet`
+  flag/sentinel reset each round) alongside the UI work.
 
 ### 6. Thread model fix (+ `Game.stop()` self-join) — `ready` (after 5) — M/L — `senior-backend-developer`
 Re-sequenced 2026-07-02 to follow item 5 rather than precede it (see item 5's

@@ -5,6 +5,7 @@ public abstract class Player extends GameObject{
     private String name;
     private Hand hand;
     private int bet;
+    private boolean hasBet;
     private int score;
     private int trickScore;
     protected ID id;
@@ -19,6 +20,7 @@ public abstract class Player extends GameObject{
         this.score = 0;
         this.trickScore = 0;
         this.bet = 0;
+        this.hasBet = false;
     }
 
     public String getName() {
@@ -39,6 +41,16 @@ public abstract class Player extends GameObject{
 
     public void setBet(int bet) {
         this.bet = bet;
+        this.hasBet = true;
+    }
+
+    public boolean hasBet() {
+        return hasBet;
+    }
+
+    public void resetBet() {
+        bet = 0;
+        hasBet = false;
     }
 
     public abstract void bet(Suit trump);
@@ -117,6 +129,11 @@ public abstract class Player extends GameObject{
             }
             hand.setY(getY());
             hand.render(g);
+
+            g.setColor(Color.BLACK);
+            g.drawString(getName(), 620, 430);
+            g.drawString(getTrickScore() + "/" + (hasBet() ? String.valueOf(getBet()) : "–"), 620, 448);
+            g.drawString("Score: " + getScore(), 620, 466);
         }
     }
 }

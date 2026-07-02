@@ -53,7 +53,7 @@ public class Game extends Canvas implements Runnable{
 
 
         players = new ArrayList<>();
-        players.add(new Human(playerNames.get(0), mouseInput));
+        players.add(new Human(playerNames.get(0), mouseInput, handler));
         //players.add(new Human(playerNames.get(1), mouseInput));
         for (int i = 1; i < numPlayers; i++) {
             players.add(new AI_Easy(playerNames.get(i)));
