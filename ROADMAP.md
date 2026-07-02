@@ -20,21 +20,20 @@ Untracked stale `out/*.class`, added `.gitignore`, deleted dead `Players.java`,
 removed dead `Window.paint()`/`p3.gif` code, derived trump border from
 `Card.WIDTH`/`HEIGHT` constants. Commit `7fc7e14`, pushed.
 
-### 2. Card image caching — `done` (commit pending)
+### 2. Card image caching — `done`
 `Card.render` no longer calls `ImageIO.read` from disk every frame; images are
 loaded once into a cache. QA measured ~874,000x speedup on cached vs. cold
-image loads. Commit in progress — see git log for the hash once pushed.
+image loads. Commit `42aafd6`, pushed.
 
-### 3. Canvas/frame insets sizing fix — `ready` — S — `senior-frontend-developer`
-`Window.java` sizes the *frame* to 840x630, but that includes OS title
-bar/borders, so the real drawable canvas is smaller (~826x593) — edges
-(including the first card in the human's hand) get clipped even on a single
-monitor. Fix: size the `Canvas` itself to 840x630 and `pack()` the frame around
-it, instead of sizing the frame. User has directly observed this defect
-(cropped left card in hand). Touches `Hand.cardAt`'s coordinate assumptions —
-re-run `TestHand` after.
-**Recommended next** — small, low-risk, and directly fixes a bug the user has
-already seen and confirmed.
+### 3. Canvas/frame insets sizing fix — `done` (commit pending)
+`Window.java` now sizes the Canvas itself to 840x630 and lets `frame.pack()`
+grow the frame around it, instead of sizing the frame directly (previously the
+frame's OS chrome shrank the actual drawable canvas below 840x630, clipping
+the leftmost card in the human's hand). Extracted a testable
+`Window.buildFrame()` seam; `TestWindowSizing.java` locks in the invariant
+without popping a window during test runs. Verified via DPI-aware screenshots
+before/after — leftmost card no longer clipped, click-through hit-testing
+unaffected. Commit pending — see git log for hash once committed.
 
 ### 4. Thread model fix (+ `Game.stop()` self-join) — `ready` — M/L — `senior-backend-developer`
 Keystone item — items 6/7 below add more shared clickable UI state, and
@@ -63,7 +62,7 @@ repaint pipeline.
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
-### 6. Mouse-driven betting + input validation — `blocked` (needs 3) — M — `game-designer` spec → `senior-frontend-developer`
+### 6. Mouse-driven betting + input validation — `blocked` (needs 4) — M — `game-designer` spec → `senior-frontend-developer`
 Clickable bet buttons (0..numCards), replacing the last remaining console
 input during play. **Bet input validation is extractable as a standalone
 stopgap at any time, independent of this item** — `Human.bet`'s
@@ -71,7 +70,7 @@ stopgap at any time, independent of this item** — `Human.bet`'s
 a `hasNextInt`/range-check loop is ~10 minutes and doesn't need to wait for
 the UI work.
 
-### 7. Between-round / end-of-game in-window UX — `blocked` (needs 3) — M — `game-designer` spec → `senior-frontend-developer`
+### 7. Between-round / end-of-game in-window UX — `blocked` (needs 4) — M — `game-designer` spec → `senior-frontend-developer`
 Scores, bets-vs-tricks-taken, round transitions, and the winner are currently
 console-only; nothing appears in the window. Spec together with item 6 in one
 `game-designer` pass so the window doesn't end up with two competing UI
