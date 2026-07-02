@@ -10,7 +10,8 @@ a running instance → explicit commit go-ahead → commit → explicit push
 go-ahead → push.
 
 ## Status legend
-`done` — committed and pushed · `ready` — unblocked, not started ·
+`done` — committed (check the item's own text for push status — not all
+`done` items are pushed yet) · `ready` — unblocked, not started ·
 `blocked` — waiting on a dependency · `deferred` — real, but intentionally low priority
 
 ## Queue
@@ -33,11 +34,10 @@ the leftmost card in the human's hand). Extracted a testable
 `Window.buildFrame()` seam; `TestWindowSizing.java` locks in the invariant
 without popping a window during test runs. Commit `83e0660`, not yet pushed.
 
-### 4. Bet input validation stopgap — `ready` — XS — `senior-backend-developer`
-`Human.bet`'s `Scanner.nextInt()` crashes the game on non-numeric input and
-accepts any value with no range check today. A `hasNextInt`/range-check loop
-(0..numCards) is ~10 minutes and standalone. **Ship this first regardless of
-how soon item 5 lands** — free insurance against an existing crash bug.
+### 4. Bet input validation stopgap — `done`
+`Human.bet` now loops on `hasNextInt`/range-check (0..numCards) instead of
+crashing on non-numeric input or accepting out-of-range values. Commit
+`f2629e9`, not yet pushed.
 
 ### 5. Mouse-driven betting + persistent bet/score display — `ready` — M — `game-designer` spec → `senior-frontend-developer`
 Two parts, scoped together since both concern the human's on-screen UI real
