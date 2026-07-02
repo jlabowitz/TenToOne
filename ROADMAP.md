@@ -3,6 +3,8 @@
 Working backlog for the `overhaul` branch. This file is the source of truth for
 task status and priority across sessions — read it before proposing what to do
 next, don't re-derive the plan from scratch or from conversation memory alone.
+Completed work lives in `DONE.md`, not here — see that file for implementation
+history and commit references.
 
 Each task, once started, goes through the full cycle: implement (TDD where
 practical) → senior-code-reviewer → senior-qa-backend/frontend → show the user
@@ -10,160 +12,205 @@ a running instance → explicit commit go-ahead → commit → explicit push
 go-ahead → push.
 
 ## Status legend
-`done` — committed (check the item's own text for push status — not all
-`done` items are pushed yet) · `ready` — unblocked, not started ·
-`blocked` — waiting on a dependency · `deferred` — real, but intentionally low priority
+`ready` — unblocked, not started · `blocked` — waiting on a dependency ·
+`deferred` — real, but intentionally low priority. (`done` items have moved to
+`DONE.md`.)
+
+## At a glance
+
+| # | Item | Status | Size | Primary owner |
+|---|------|--------|------|----------------|
+| 1 | Thread model fix (+ `Game.stop()` self-join) | ready | M/L | `senior-backend-developer` |
+| 2 | Trick-leader indicator | ready | S/M | `game-designer` → `senior-frontend-developer` |
+| 3 | In-window round & game-flow UX (transitions, click-to-continue, outcome banner) | blocked (needs 1) | M/L | `game-designer` spec → `senior-frontend-developer` |
+| 4 | Invalid-move on-screen feedback | ready | S/M | `game-designer` (treatment) → `senior-frontend-developer` |
+| 5 | Start screen + rules/options menu + player name input | ready | M/L | `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer` |
+| 6 | Play again (in-window restart) | blocked (needs 3) | S/M | `senior-frontend-developer` + `senior-backend-developer` |
+| 7 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
+| 8 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
+| 9 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
+| 10 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+
+## Big picture: eliminate the terminal
+
+Stated goal, added 2026-07-02: the game should be fully playable with no
+terminal visible at all — every prompt, status message, and outcome should
+render in the window. The two console-input points that used to block this
+(bet validation, bet entry) are already gone — see `DONE.md` items 4-5.
+Remaining terminal touchpoints, each tracked below: round-transition/score/
+winner messages, the click-to-continue cue, and the outcome banner (all
+folded into item 3); invalid-move feedback (item 4); startup/rules text and
+name entry (item 5); and restarting without relaunching the process (item 6).
+Treat this as the throughline when scoping any of those items, not just a
+description of each in isolation.
 
 ## Queue
 
-### 1. Repo hygiene sweep — `done`
-Untracked stale `out/*.class`, added `.gitignore`, deleted dead `Players.java`,
-removed dead `Window.paint()`/`p3.gif` code, derived trump border from
-`Card.WIDTH`/`HEIGHT` constants. Commit `7fc7e14`, pushed.
+### 1. Thread model fix (+ `Game.stop()` self-join) — `ready` — M/L — `senior-backend-developer`
+Fix `Handler`'s index-based `LinkedList` iteration — the concrete data race
+and an O(n^2) walk per frame. Define real thread ownership (logic thread
+mutates, render thread reads a safe view). Fold in the `Game.stop()`
+self-join fix (same thread-lifecycle code, currently unreachable but a
+latent deadlock).
 
-### 2. Card image caching — `done`
-`Card.render` no longer calls `ImageIO.read` from disk every frame; images are
-loaded once into a cache. QA measured ~874,000x speedup on cached vs. cold
-image loads. Commit `42aafd6`, pushed.
+Sequenced first among the not-done items: every item below adds more
+`Handler`-based render state (HUDs, banners, indicators) on top of a
+currently-unaudited threading model. Better to fix ownership now than pile a
+fourth or fifth generation of races onto it. Hardest item to QA — races
+don't unit-test well; expect review to do the heavy lifting plus a soak-run
+harness from QA.
 
-### 3. Canvas/frame insets sizing fix — `done`
-`Window.java` now sizes the Canvas itself to 840x630 and lets `frame.pack()`
-grow the frame around it, instead of sizing the frame directly (previously the
-frame's OS chrome shrank the actual drawable canvas below 840x630, clipping
-the leftmost card in the human's hand). Extracted a testable
-`Window.buildFrame()` seam; `TestWindowSizing.java` locks in the invariant
-without popping a window during test runs. Commit `83e0660`, pushed.
+### 2. Trick-leader indicator — `ready` — S/M — `game-designer` (symbol/placement) → `senior-frontend-developer`
+During betting it's hard to tell who will lead the trick. Add a small
+on-screen symbol next to the current trick-leader's name/HUD position
+(candidates: black diamond, circle, triangle — user is open to any
+easy-to-render shape), visible during betting and carried through play so
+it's legible at a glance rather than mentally tracked. Low-ambiguity enough
+that `game-designer` likely only needs to confirm symbol choice and exact
+placement, not a full spec pass.
 
-### 4. Bet input validation stopgap — `done`
-`Human.bet` now loops on `hasNextInt`/range-check (0..numCards) instead of
-crashing on non-numeric input or accepting out-of-range values. Commit
-`f2629e9`, pushed.
+Small and independent of the "eliminate the terminal" cluster below —
+sequenced right after item 1 as a quick, low-risk win before the larger UI
+lift in item 3.
 
-### 5. Mouse-driven betting + persistent bet/score display — `done` — M — `game-designer` spec → `senior-frontend-developer`
-Implementation complete 2026-07-02 (`BetStepper`, `Human`/`Player`/`Round`/`Game` wiring, `TestBetStepper.java`) but **not yet committed** — commit hash to be added here in a follow-up housekeeping edit after the commit lands.
-Two parts, scoped together since both concern the human's on-screen UI real
-estate: (a) clickable bet buttons (0..numCards), replacing the last
-remaining console input during play; (b) persistent on-screen display of the
-human's own bet and score for the duration of each round, mirroring what AI
-opponents already show (`Player.render`'s `ID.AI` branch, `Player.java`
-~106-111, draws `getTrickScore() + "/" + getBet()` and
-`"Score: " + getScore()` near each AI's position; the `ID.HUMAN` branch,
-~112-121, renders only the hand today -- added 2026-07-02 per user request).
-Distinct from item 7, which covers round-transition/end-of-game summary UI,
-not this per-round live HUD element.
+### 3. In-window round & game-flow UX — `blocked` (needs 1) — M/L — `game-designer` spec → `senior-frontend-developer`
+Merged 2026-07-02 from three previously separate queue items — round-
+transition/score/winner UX, the click-to-continue affordance, and the
+end-of-game outcome screen — because all three render at the same points in
+the game loop (trick resolves → round ends → game ends) and were already
+flagged as overlapping. One `game-designer` spec pass covers all three
+sub-parts together, then one implementation pass, rather than touching the
+same transition code three separate times:
 
-Reprioritized 2026-07-02 to go next, ahead of item 6, after re-examining
-whether the thread-model fix actually needs to precede it: it doesn't. Part
-(a) reuses the exact same `MouseInput`/`awaitClick`/`clearClicks` plumbing
-already shipped and working for card-play (commit `1153913`) -- the
-click-queue handoff is generic `Point`-based hit-testing, directly reusable
-for bet-button geometry the same way `Hand.cardAt` hit-tests cards. The race
-conditions item 6 targets (`Handler`'s index-based `LinkedList` mutated
-across threads) are not gated behind this feature -- `Round.bet()` already
-calls `handler.addObject(trumpCard)`/`handler.addObject(playersHand)` on the
-game-logic thread every round, concurrently with the render thread's
-`Handler.tick()`/`render()` loop, via the identical
-`Handler.addObject`/`removeAll` pattern this item would use. This UI adds
-more instances of an already-live, already-accepted pattern, not a new
-category of risk.
+- (a) **Round-transition & score summary** — scores, bets-vs-tricks-taken,
+  and round transitions currently print to console only; nothing appears in
+  the window.
+- (b) **Click-to-continue affordance** — after a trick resolves, nothing on
+  screen indicates a click is expected to advance to the next trick/round —
+  today that's discoverable only by trial and error. Add a visible prompt at
+  the point the game is already blocking on a human click.
+- (c) **End-of-game outcome banner** — when the game ends there's no
+  on-screen win/loss indication today (console only, not visible during
+  normal play).
 
-`game-designer` pass reinstated 2026-07-02 (originally skipped for
-bet-buttons alone as low-ambiguity) -- with part (b) added, there's now real
-layout ambiguity: the human's hand already occupies screen space differently
-than the AI row (bottom-of-screen hand vs. top-row AI labels), so where the
-human's own bet/score readout and the bet-input buttons go relative to the
-hand needs an actual design call, not an assumption. Scope the
-`game-designer` pass to exactly two decisions: (a) bet-input button layout,
-and (b) live bet+score display placement for the human player.
+Note: "play again" (in-window restart) is deliberately **not** included here
+— see item 6.
 
-**Design approved 2026-07-02** -- spec from `game-designer`, revised once
-after user feedback rejected an initial 11-button row as cluttered:
-- (a) Numeric stepper, not discrete buttons: a single horizontal row
-  `[ − ][ value ][ + ][ Bet ]` anchored at x=620 (same x as the HUD, so the
-  two read as one right-side info/control column), y=585-619, 180px total
-  width. Decrement/increment adjust the draft value by 1, clamped
-  (inert no-op at 0 or numCards, not wraparound). "Bet" commits, reusing the
-  existing `Human.isValidBet` predicate as a defensive check. Implement as
-  one composite `GameObject` ("BetStepper") owning the draft value and a
-  single hit-test method (returns which sub-control was hit), added to
-  `Handler` on entry to `Human.bet()` and removed on return, matching
-  `Human.playCard`'s existing lifecycle pattern. Fixed x position (unlike
-  the rejected spec's per-round-centered row) means the control's screen
-  location doesn't shift between rounds. Hover feedback and press-and-hold
-  auto-repeat on the arrows are both deferred -- no `MouseMotionListener` or
-  repeat-timer capability exists in the codebase today, and the range is
-  small enough (at most 10 discrete clicks) that the UX cost is low.
-  Needs its own `TestBetStepper.java` (pure hit-test geometry, no window),
-  mirroring `TestHand.java`'s convention.
-- (b) HUD: fixed text position at x=620, three lines at y=430/448/466 (the
-  AI branch's `(getX(), getY())` anchor can't be reused -- human `Player`'s
-  stored coords are the hand's layout anchor, x=840 is off-canvas). Same
-  content format as the AI HUD: `trickScore/bet`, `Score: N`. Disjoint
-  y-band from the stepper (HUD ~y=420-470, stepper y=585-619) -- no overlap.
-  Note (not a defect, no fix needed): while the stepper is mid-adjustment
-  pre-submit, the HUD still shows the last *committed* bet, not the
-  in-progress draft value -- the stepper's own value display already shows
-  the draft number, so this is expected, not stale data.
-- (c) Bundled fix: `Player.bet` is never reset between rounds today (only
-  `trickScore` gets a per-round reset via `resetTrickScore()`) -- without a
-  fix the new HUD would show last round's bet as already-placed before the
-  human bets this round. Includes a small state addition (e.g. a `hasBet`
-  flag/sentinel reset each round) alongside the UI work.
+### 4. Invalid-move on-screen feedback — `ready` — S/M — `game-designer` (treatment) → `senior-frontend-developer`
+When the player attempts an illegal move (e.g. a card that doesn't follow
+suit), there's no on-screen indication the move was rejected. User suggested
+a fading red message but is open to whatever `game-designer` recommends
+(border flash, shake, etc.) — needs a design call on exact treatment before
+implementation.
 
-### 6. Thread model fix (+ `Game.stop()` self-join) — `ready` (after 5) — M/L — `senior-backend-developer`
-Re-sequenced 2026-07-02 to follow item 5 rather than precede it (see item 5's
-note) -- not a hard blocker for betting, but still the right keystone before
-item 7's larger UI lift (score displays, round transitions, winner banner)
-piles a third generation of shared render state onto an unaudited model.
-Fix `Handler`'s index-based `LinkedList` iteration (the concrete race surface
-*and* an O(n^2) walk per frame); define actual thread ownership (logic thread
-mutates, render thread reads a safe view); fold in the `Game.stop()`
-self-join fix (same thread-lifecycle code, currently unreachable but a latent
-deadlock). Hardest item to QA -- races don't unit-test well; expect review to
-do the heavy lifting plus a soak-run harness from QA.
+Independent of item 3 (different trigger point — an illegal move attempt,
+not trick/round resolution) but same "eliminate the terminal" theme;
+sequenced after item 3 since it's the smaller, more isolated fix of the two.
 
-### 7. Between-round / end-of-game in-window UX — `blocked` (needs 6) — M — `game-designer` spec → `senior-frontend-developer`
-Scores, bets-vs-tricks-taken, round transitions, and the winner are currently
-console-only; nothing appears in the window. Decoupled 2026-07-02 from item
-5's spec pass (they no longer sit adjacent in the queue) -- this item has
-real design surface (score displays, round transitions, winner banner) and
-keeps its own dedicated `game-designer` pass, done independently once its
-turn comes.
+### 5. Start screen + rules/options menu + player name input — `ready` — M/L — `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer`
+No start screen exists today — the game launches straight into play with
+the human hardcoded as "Jacob." Add a start screen with a rules/instructions
+view (also reachable mid-game, not just pre-launch) and a name-entry field,
+likely the seed of a fuller options menu later. Large and open-ended enough
+that `game-designer` should scope an MVP (start screen + rules + name entry)
+versus what gets deferred to a later dedicated options-menu pass. Name entry
+touches `Player`/`Game` setup, hence the `senior-backend-developer`
+co-assignment alongside the frontend screen work.
 
-### 8. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
+Sequenced after the higher-frequency in-game fixes (items 3-4) since a start
+screen is encountered once per session, not once per trick.
+
+### 6. Play again (in-window restart) — `blocked` (needs 3) — S/M — `senior-frontend-developer` + `senior-backend-developer`
+Split out of the old end-of-game item 2026-07-02: showing the outcome (item
+3c) and restarting the game are different capabilities. This one needs
+actual game-lifecycle/restart logic (re-initializing `Game`/`Round` state
+without relaunching the process), not just a rendering addition. Blocked on
+item 3 landing first, since "play again" needs an outcome screen to attach
+its button to.
+
+### 7. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
 `AI_Zombie` is unused but functional (always plays first legal card) — a
-natural "easy" difficulty tier if a difficulty picker lands; do not delete it.
-Candidates: smarter betting/strategy, opponent card-count display (overlaps
-item 7), play animations.
+natural "easy" difficulty tier if a difficulty picker lands; do not delete
+it. Candidates: smarter betting/strategy, opponent card-count display
+(overlaps item 3), play animations.
 
-### 9. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
+### 8. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
-monitor to a secondary monitor with a different Windows display-scale factor
-causes blurry/stretched rendering. Root cause: the game renders via a raw
-`Canvas` + `BufferStrategy` (`Game.java`), a lower-level pipeline than
+monitor to a secondary monitor with a different Windows display-scale
+factor causes blurry/stretched rendering. Root cause: the game renders via a
+raw `Canvas` + `BufferStrategy` (`Game.java`), a lower-level pipeline than
 standard Swing painting, which is known to not gracefully handle
 `WM_DPICHANGED`/per-monitor scale changes — the pixel buffer stays sized for
 whichever monitor's DPI was active at creation, and Windows bitmap-stretches
 it to fit the new monitor instead of the app redrawing natively. This is
-**distinct from item 3** (which only fixed a static single-monitor
-insets/cropping bug) and would likely need explicit DPI-change handling or
-migrating off raw `Canvas`/`BufferStrategy` toward Swing's more DPI-aware
-repaint pipeline.
+distinct from the old canvas-sizing fix (`DONE.md` item 3, a static
+single-monitor insets/cropping bug) and would likely need explicit
+DPI-change handling or migrating off raw `Canvas`/`BufferStrategy` toward
+Swing's more DPI-aware repaint pipeline.
+
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
+### 9. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
+Added 2026-07-02 per user request: "much later down the line," a full
+visual/art overhaul of the game beyond the functional UI fixes above.
+Intentionally deferred — revisit once the functional/UX backlog (items 1-7)
+is in a good place; scoping it now would be premature.
+
+### 10. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
+Added 2026-07-02 per user request, **explicitly planning-only — do not
+implement yet**. The current `src/` layout is flat: all production and test
+`.java` files live directly under `src/` with no subfolders, a structure the
+user describes as "legacy... not sure it was best practice." Worth
+reconsidering: separating production classes from test classes
+(`TestGame.java`, `TestHand.java`, etc.), and possibly grouping related
+production classes into subpackages (e.g. rendering/game-object classes vs.
+game-logic classes) rather than everything flat under `src/`.
+
+This is a real migration, not a free reorg, given the project's no-build-tool
+setup (see `CLAUDE.md`):
+- Compilation is a flat glob (`javac ... src/*.java`) with no recursion —
+  any subfolder split requires changing this to a recursive form (an
+  explicit file list, a `find`-generated sources list, or adopting a build
+  tool, which is a bigger decision of its own).
+- Java requires folder structure to match `package` declarations once files
+  aren't flat — every moved file needs a `package` statement added, and
+  every reference to that class elsewhere needs an `import`. Currently no
+  file has a package declaration (everything is in the unnamed/default
+  package).
+- Tests currently run via bare class names (`JUnitCore TestGame TestHand`)
+  with no package prefix; once test classes have packages, those invocations
+  need fully-qualified names instead.
+- `CLAUDE.md`'s documented Build/Test/Run commands would all need updating
+  to match, so this touches project documentation as well as source layout.
+
+Whoever picks this item up should produce a proposed subfolder structure and
+a concrete list of what changes (build command, test invocation, CLAUDE.md,
+every file's package/import) before touching any files — not attempt the
+migration inline with unrelated work.
+
 ---
 
-Notes:
-- Item 9 (multi-monitor DPI) was item 5 in the old numbering -- moved to the end since it's deferred and everything else outranks it now.
+## Notes
 
-## Known process gap (largely fixed)
+- Completed items (former queue #1-5) moved to `DONE.md` on 2026-07-02 to
+  keep this file focused on active/upcoming priority. See `DONE.md` for full
+  implementation history and commit references.
+- This file was fully reorganized and renumbered on 2026-07-02: three former
+  items were merged (round-transition/score/winner UX + click-to-continue +
+  end-of-game outcome → new item 3), one was split out (old end-of-game
+  item's "play again" scope → new item 6), and the whole not-done queue was
+  reprioritized around the "eliminate the terminal" theme. Old item numbers
+  from before this reorg are not preserved here — consult git history or
+  `DONE.md` if you need the prior numbering.
+
+## Process notes
 
 QA's screenshot checks (via `java.awt.Robot`) used to only verify "no
 exceptions in the log," not actual visual/pixel quality. This is now
-routinely fixed in practice: subagents with a `Read` tool can (and during
-item 3's QA, did) read a captured screenshot PNG and visually describe it
-themselves — vision isn't unique to the main conversation, any Claude
+routinely fixed in practice: subagents with a `Read` tool can (and during an
+earlier item's QA, did) read a captured screenshot PNG and visually describe
+it themselves — vision isn't unique to the main conversation, any Claude
 instance with `Read` on an image has it. Use that for any UI-touching change
 rather than trusting "no exceptions" alone.
 
