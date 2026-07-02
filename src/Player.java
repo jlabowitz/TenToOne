@@ -111,8 +111,12 @@ public abstract class Player extends GameObject{
         }
         else if (id == ID.HUMAN) {
             Hand hand = getHand();
+            //hand is null until the first round has been dealt
+            if (hand == null) {
+                return;
+            }
             hand.setY(getY());
-            getHand().render(g);
+            hand.render(g);
         }
     }
 }

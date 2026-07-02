@@ -168,7 +168,12 @@ public class Game extends Canvas implements Runnable{
                 delta--;
             }
             if (running) {
-                render();
+                //a failed frame must not kill the render thread for the rest of the session
+                try {
+                    render();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
             frames++;
             if (System.currentTimeMillis() - timer > 1000) {
