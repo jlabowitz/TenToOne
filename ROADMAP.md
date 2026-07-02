@@ -32,12 +32,12 @@ grow the frame around it, instead of sizing the frame directly (previously the
 frame's OS chrome shrank the actual drawable canvas below 840x630, clipping
 the leftmost card in the human's hand). Extracted a testable
 `Window.buildFrame()` seam; `TestWindowSizing.java` locks in the invariant
-without popping a window during test runs. Commit `83e0660`, not yet pushed.
+without popping a window during test runs. Commit `83e0660`, pushed.
 
 ### 4. Bet input validation stopgap — `done`
 `Human.bet` now loops on `hasNextInt`/range-check (0..numCards) instead of
 crashing on non-numeric input or accepting out-of-range values. Commit
-`f2629e9`, not yet pushed.
+`f2629e9`, pushed.
 
 ### 5. Mouse-driven betting + persistent bet/score display — `ready` — M — `game-designer` spec → `senior-frontend-developer`
 Two parts, scoped together since both concern the human's on-screen UI real
@@ -122,12 +122,28 @@ Revisit if that changes.
 Notes:
 - Item 9 (multi-monitor DPI) was item 5 in the old numbering -- moved to the end since it's deferred and everything else outranks it now.
 
-## Known process gap (being fixed)
+## Known process gap (largely fixed)
 
-QA's screenshot checks (via `java.awt.Robot`) verify "no exceptions in the
-log," not actual visual/pixel quality — a subagent's textual description of a
-screenshot is not the same as someone actually looking at it. The main
-conversation (which has vision) should be the one to visually inspect
-screenshots for any UI-touching change, using a screenshot the user supplies
-if the automation session can't see the user's actual desktop (confirmed
-2026-07-02: it can't — different session).
+QA's screenshot checks (via `java.awt.Robot`) used to only verify "no
+exceptions in the log," not actual visual/pixel quality. This is now
+routinely fixed in practice: subagents with a `Read` tool can (and during
+item 3's QA, did) read a captured screenshot PNG and visually describe it
+themselves — vision isn't unique to the main conversation, any Claude
+instance with `Read` on an image has it. Use that for any UI-touching change
+rather than trusting "no exceptions" alone.
+
+One earlier claim in this file was likely wrong and worth correcting: on
+2026-07-02 an attempt to self-capture a screenshot via `Robot` appeared to
+show an empty desktop with no game window, leading to a conclusion that "the
+automation session can't see the user's actual desktop." The user's own
+multi-monitor setup (confirmed same day, when they reported the game
+stretching when dragged to a second monitor) makes a much simpler
+explanation likely: that capture used
+`GraphicsEnvironment.getDefaultScreenDevice()`, which only grabs the
+*primary* monitor's bounds — if the window was on/near a different monitor
+at that moment, the capture would legitimately miss it without proving
+session isolation at all. Windows launched by tool calls in this
+conversation were consistently visible to and interactive with the user
+throughout the rest of the session. Before assuming screenshots can't work,
+try capturing all screens (iterate
+`GraphicsEnvironment.getScreenDevices()`), not just the default one.
