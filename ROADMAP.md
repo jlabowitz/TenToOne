@@ -20,16 +20,15 @@ go-ahead → push.
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 1 | Thread model fix (+ `Game.stop()` self-join) | ready | M/L | `senior-backend-developer` |
-| 2 | Trick-leader indicator | ready | S/M | `game-designer` → `senior-frontend-developer` |
-| 3 | In-window round & game-flow UX (transitions, click-to-continue, outcome banner) | blocked (needs 1) | M/L | `game-designer` spec → `senior-frontend-developer` |
-| 4 | Invalid-move on-screen feedback | ready | S/M | `game-designer` (treatment) → `senior-frontend-developer` |
-| 5 | Start screen + rules/options menu + player name input | ready | M/L | `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer` |
-| 6 | Play again (in-window restart) | blocked (needs 3) | S/M | `senior-frontend-developer` + `senior-backend-developer` |
-| 7 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
-| 8 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
-| 9 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
-| 10 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+| 1 | Trick-state indicators (leader, led suit, high card) | ready | S/M | `game-designer` spec → `senior-frontend-developer` |
+| 2 | In-window round & game-flow UX (transitions, click-to-continue, outcome banner) | ready | M/L | `game-designer` spec → `senior-frontend-developer` |
+| 3 | Invalid-move on-screen feedback | ready | S/M | `game-designer` (treatment) → `senior-frontend-developer` |
+| 4 | Start screen + rules/options menu + player name input | ready | M/L | `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer` |
+| 5 | Play again (in-window restart) | blocked (needs 2) | S/M | `senior-frontend-developer` + `senior-backend-developer` |
+| 6 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
+| 7 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
+| 8 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
+| 9 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
 
 ## Big picture: eliminate the terminal
 
@@ -39,41 +38,45 @@ render in the window. The two console-input points that used to block this
 (bet validation, bet entry) are already gone — see `DONE.md` items 4-5.
 Remaining terminal touchpoints, each tracked below: round-transition/score/
 winner messages, the click-to-continue cue, and the outcome banner (all
-folded into item 3); invalid-move feedback (item 4); startup/rules text and
-name entry (item 5); and restarting without relaunching the process (item 6).
+folded into item 2); invalid-move feedback (item 3); startup/rules text and
+name entry (item 4); and restarting without relaunching the process (item 5).
 Treat this as the throughline when scoping any of those items, not just a
 description of each in isolation.
 
 ## Queue
 
-### 1. Thread model fix (+ `Game.stop()` self-join) — `ready` — M/L — `senior-backend-developer`
-Fix `Handler`'s index-based `LinkedList` iteration — the concrete data race
-and an O(n^2) walk per frame. Define real thread ownership (logic thread
-mutates, render thread reads a safe view). Fold in the `Game.stop()`
-self-join fix (same thread-lifecycle code, currently unreachable but a
-latent deadlock).
+### 1. Trick-state indicators (leader, led suit, high card) — `ready` — S/M — `game-designer` spec → `senior-frontend-developer`
+Grew from a smaller trick-leader-only item after user feedback 2026-07-02;
+now covers three related pieces of trick state a player has to mentally
+track today, all worth designing as one pass since they render at the same
+place/time (during betting and through a trick):
 
-Sequenced first among the not-done items: every item below adds more
-`Handler`-based render state (HUDs, banners, indicators) on top of a
-currently-unaudited threading model. Better to fix ownership now than pile a
-fourth or fifth generation of races onto it. Hardest item to QA — races
-don't unit-test well; expect review to do the heavy lifting plus a soak-run
-harness from QA.
+- **Trick leader**: during betting it's hard to tell who will lead the
+  trick. Add a small on-screen symbol next to the current trick-leader's
+  name/HUD position (candidates: black diamond, circle, triangle — user is
+  open to any easy-to-render shape), visible during betting and carried
+  through play.
+- **Led suit**: once a trick is underway, there's no at-a-glance indication
+  of which suit was led, which is exactly the information the human needs to
+  know which of their own cards are legal follows.
+- **High card**: the current highest-valued card played in the trick so far
+  should be highlighted/indicated in some way, so a player can tell whether
+  their card would actually win before committing to it.
 
-### 2. Trick-leader indicator — `ready` — S/M — `game-designer` (symbol/placement) → `senior-frontend-developer`
-During betting it's hard to tell who will lead the trick. Add a small
-on-screen symbol next to the current trick-leader's name/HUD position
-(candidates: black diamond, circle, triangle — user is open to any
-easy-to-render shape), visible during betting and carried through play so
-it's legible at a glance rather than mentally tracked. Low-ambiguity enough
-that `game-designer` likely only needs to confirm symbol choice and exact
-placement, not a full spec pass.
+User floated two layout directions — a central UI element consolidating all
+three, or indicators scattered near their respective on-screen areas (e.g.
+next to each played card / each player's HUD), and thought scattered "might
+be more intuitive" but left the call to `game-designer`. No longer
+low-ambiguity enough for a quick confirm-only pass (as the original
+leader-only version was scoped) — needs a real `game-designer` spec
+covering symbol/highlight choice and placement for all three pieces
+together.
 
-Small and independent of the "eliminate the terminal" cluster below —
-sequenced right after item 1 as a quick, low-risk win before the larger UI
-lift in item 3.
+Sequenced first now that the thread model fix (former queue #1, see
+`DONE.md`) is done — small and independent of the "eliminate the terminal"
+cluster below, a quick win before the larger UI lift in item 2.
 
-### 3. In-window round & game-flow UX — `blocked` (needs 1) — M/L — `game-designer` spec → `senior-frontend-developer`
+### 2. In-window round & game-flow UX — `ready` — M/L — `game-designer` spec → `senior-frontend-developer`
 Merged 2026-07-02 from three previously separate queue items — round-
 transition/score/winner UX, the click-to-continue affordance, and the
 end-of-game outcome screen — because all three render at the same points in
@@ -94,20 +97,20 @@ same transition code three separate times:
   normal play).
 
 Note: "play again" (in-window restart) is deliberately **not** included here
-— see item 6.
+— see item 5.
 
-### 4. Invalid-move on-screen feedback — `ready` — S/M — `game-designer` (treatment) → `senior-frontend-developer`
+### 3. Invalid-move on-screen feedback — `ready` — S/M — `game-designer` (treatment) → `senior-frontend-developer`
 When the player attempts an illegal move (e.g. a card that doesn't follow
 suit), there's no on-screen indication the move was rejected. User suggested
 a fading red message but is open to whatever `game-designer` recommends
 (border flash, shake, etc.) — needs a design call on exact treatment before
 implementation.
 
-Independent of item 3 (different trigger point — an illegal move attempt,
+Independent of item 2 (different trigger point — an illegal move attempt,
 not trick/round resolution) but same "eliminate the terminal" theme;
-sequenced after item 3 since it's the smaller, more isolated fix of the two.
+sequenced after item 2 since it's the smaller, more isolated fix of the two.
 
-### 5. Start screen + rules/options menu + player name input — `ready` — M/L — `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer`
+### 4. Start screen + rules/options menu + player name input — `ready` — M/L — `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer`
 No start screen exists today — the game launches straight into play with
 the human hardcoded as "Jacob." Add a start screen with a rules/instructions
 view (also reachable mid-game, not just pre-launch) and a name-entry field,
@@ -117,24 +120,24 @@ versus what gets deferred to a later dedicated options-menu pass. Name entry
 touches `Player`/`Game` setup, hence the `senior-backend-developer`
 co-assignment alongside the frontend screen work.
 
-Sequenced after the higher-frequency in-game fixes (items 3-4) since a start
+Sequenced after the higher-frequency in-game fixes (items 2-3) since a start
 screen is encountered once per session, not once per trick.
 
-### 6. Play again (in-window restart) — `blocked` (needs 3) — S/M — `senior-frontend-developer` + `senior-backend-developer`
+### 5. Play again (in-window restart) — `blocked` (needs 2) — S/M — `senior-frontend-developer` + `senior-backend-developer`
 Split out of the old end-of-game item 2026-07-02: showing the outcome (item
-3c) and restarting the game are different capabilities. This one needs
+2c) and restarting the game are different capabilities. This one needs
 actual game-lifecycle/restart logic (re-initializing `Game`/`Round` state
 without relaunching the process), not just a rendering addition. Blocked on
-item 3 landing first, since "play again" needs an outcome screen to attach
+item 2 landing first, since "play again" needs an outcome screen to attach
 its button to.
 
-### 7. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
+### 6. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
 `AI_Zombie` is unused but functional (always plays first legal card) — a
 natural "easy" difficulty tier if a difficulty picker lands; do not delete
 it. Candidates: smarter betting/strategy, opponent card-count display
-(overlaps item 3), play animations.
+(overlaps item 2), play animations.
 
-### 8. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
+### 7. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
 monitor to a secondary monitor with a different Windows display-scale
 factor causes blurry/stretched rendering. Root cause: the game renders via a
@@ -151,13 +154,13 @@ Swing's more DPI-aware repaint pipeline.
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
-### 9. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
+### 8. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
 Added 2026-07-02 per user request: "much later down the line," a full
 visual/art overhaul of the game beyond the functional UI fixes above.
-Intentionally deferred — revisit once the functional/UX backlog (items 1-7)
+Intentionally deferred — revisit once the functional/UX backlog (items 1-6)
 is in a good place; scoping it now would be premature.
 
-### 10. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
+### 9. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
 Added 2026-07-02 per user request, **explicitly planning-only — do not
 implement yet**. The current `src/` layout is flat: all production and test
 `.java` files live directly under `src/` with no subfolders, a structure the
@@ -193,6 +196,12 @@ migration inline with unrelated work.
 
 ## Notes
 
+- Thread model fix (former queue #1) shipped and moved to `DONE.md` on
+  2026-07-02 (commit `fae32e5`), unblocking former item 3. Same day, the
+  trick-leader item grew in scope per user feedback — led-suit and
+  high-card-in-trick indicators folded in alongside the leader symbol — and
+  the queue was renumbered accordingly (old #2 → new #1, old #3 → new #2,
+  etc.; old #1 removed).
 - Completed items (former queue #1-5) moved to `DONE.md` on 2026-07-02 to
   keep this file focused on active/upcoming priority. See `DONE.md` for full
   implementation history and commit references.

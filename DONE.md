@@ -61,6 +61,30 @@ an initial 11-button row as cluttered):
   `trickScore` was, via `resetTrickScore()`) — fixed alongside the HUD work
   so a new round doesn't show last round's bet as already placed.
 
+### 1. Thread model fix (Handler race + Game.stop() self-join) — done, pushed
+`Handler`'s object list was a `LinkedList` walked by index while a separate
+thread concurrently added/removed objects during play — a genuine data race
+(proven by a regression test that fails on the old code) and an O(n^2)
+per-frame walk. Swapped to `CopyOnWriteArrayList` with enhanced-for
+iteration in `tick()`/`render()`; public method signatures unchanged, no
+callers touched.
+
+`Game.stop()` had a self-join deadlock (its own thread joining itself) and,
+once that was fixed, an ordering bug (`running` only flipped `false` after
+the blocking `join()` returned, which would hang any future external
+caller). `stop()` now sets `running = false` unconditionally up front and
+only joins when called from a thread other than the one it's stopping;
+no longer `synchronized`. Code review caught a follow-on gap this surfaced —
+removing `synchronized` broke `thread`'s cross-thread visibility, so it
+needed `volatile` too (not just `running`) — fixed and re-confirmed.
+
+QA soak-tested beyond the unit suite: two custom scratch harnesses ran 180s
+of sustained concurrent tick/render vs. add/remove (128,305 cycles, 327M+
+mutation ops, zero exceptions) and 1,000 `start()`/`stop()` lifecycle cycles
+across both self-join and external-join paths (zero hangs). New
+`TestHandler.java` (4 tests) and 2 new `TestGame.java` tests. Commit
+`fae32e5`.
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.
