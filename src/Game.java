@@ -12,8 +12,12 @@ public class Game extends Canvas implements Runnable{
     @Serial
     private static final long serialVersionUID = 7694947508904043283L;
     public static final int WIDTH = 840, HEIGHT = WIDTH/12 * 9;
-    private Thread thread;
-    private boolean running = false;
+    private volatile Thread thread;
+    //written by stop() (from either the game thread or an external caller)
+    //and read every loop iteration by run() on the game thread -- volatile
+    //so a write is guaranteed visible to run()'s while(running) check
+    //without relying on stop()'s (now removed) synchronized lock for it.
+    private volatile boolean running = false;
     private final Handler handler;
 
     private final List<Player> players;
@@ -40,11 +44,21 @@ public class Game extends Canvas implements Runnable{
     }
     */
 
+    /**
+     * Split out from the constructor so tests can skip popping a real
+     * on-screen window (Window's own constructor calls game.start()) --
+     * mirrors Window.buildFrame's split for the same reason. Package-
+     * private and non-final so a test subclass can override it to a no-op.
+     */
+    void buildWindow() {
+        new Window(WIDTH, HEIGHT, "Ten to One", this);
+    }
+
     public Game(List<String> playerNames) {
         handler = new Handler();
         MouseInput mouseInput = new MouseInput();
         this.addMouseListener(mouseInput);
-        new Window(WIDTH, HEIGHT, "Ten to One", this);
+        buildWindow();
 
         //handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
 
@@ -139,16 +153,43 @@ public class Game extends Canvas implements Runnable{
         return (curr + 1) % numPlayers();
     }
 
+    public boolean isRunning() {
+        return running;
+    }
+
     public synchronized void start() {
         thread = new Thread(this);
         thread.start();
         running = true;
     }
 
-    public synchronized void stop() {
+    /**
+     * Not synchronized: run() itself calls stop() (on the game thread) right
+     * after its own while(running) loop exits. If stop() were a synchronized
+     * instance method, an external caller blocked here inside thread.join()
+     * would still be holding this instance's monitor, and the game thread's
+     * own self-invoked stop() call would block forever trying to enter that
+     * same synchronized method -- a deadlock distinct from (and in addition
+     * to) the self-join case below. Neither running nor thread needs the
+     * monitor for correctness here: running is volatile (see field comment)
+     * and thread is only ever written by start().
+     */
+    public void stop() {
+        //flip this unconditionally, and before the join below, so run()'s
+        //while(running) loop -- possibly still spinning on another thread
+        //right now -- can observe it and exit. The old code set this only
+        //after thread.join() returned, so a stop() call from any thread
+        //other than `thread` itself would block forever: nothing would ever
+        //flip running to let the loop that join() is waiting on finish.
+        running = false;
         try {
-            thread.join();
-            running = false;
+            //a thread can't join itself: run() reaches this same stop() call
+            //on `thread` once its own loop exits, so skip the join in that
+            //case -- there's nothing left to wait for, run() is already
+            //returning right after this call.
+            if (thread != null && Thread.currentThread() != thread) {
+                thread.join();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

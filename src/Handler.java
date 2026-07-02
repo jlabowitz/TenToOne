@@ -1,20 +1,27 @@
 import java.awt.*;
 import java.util.List;
-import java.util.LinkedList;
+import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * object is written by the game-logic thread (Round/Trick/Human add and
+ * remove cards/hands/UI elements as play progresses) and read every frame by
+ * the render/tick thread (Game.run() -> tick()/render()). CopyOnWriteArrayList
+ * gives tick()/render() a stable, exception-free snapshot to iterate even
+ * while the logic thread concurrently mutates the live list -- appropriate
+ * here since this list is small (players plus a handful of in-play objects)
+ * and mutated far less often than it's read (60x/sec).
+ */
 public class Handler {
-    LinkedList<GameObject> object = new LinkedList<>();
+    CopyOnWriteArrayList<GameObject> object = new CopyOnWriteArrayList<>();
 
     public void tick() {
-        for (int i = 0; i < object.size(); i++) {
-            GameObject tempObject = object.get(i);
+        for (GameObject tempObject : object) {
             tempObject.tick();
         }
     }
 
     public void render(Graphics g) {
-        for (int i = 0; i < object.size(); i++) {
-            GameObject tempObject = object.get(i);
+        for (GameObject tempObject : object) {
             tempObject.render(g);
         }
     }
