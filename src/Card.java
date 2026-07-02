@@ -3,6 +3,8 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Card extends GameObject {
     /** Rendered card size in pixels; also used for click hit-testing. */
@@ -49,6 +51,41 @@ public class Card extends GameObject {
 
     }
 
+    /**
+     * Card images are a small, fixed set of static assets (52 files) that
+     * never change during a run, so a single process-wide cache with no
+     * eviction is sufficient. ConcurrentHashMap is used even though the
+     * render thread is the only reader/writer in practice today: this
+     * codebase has already had one unsynchronized-shared-state bug (see the
+     * TestGame regression comments), so cheap thread-safety insurance here
+     * costs nothing and removes one more thing to get wrong later.
+     */
+    private static final Map<String, BufferedImage> imageCache = new ConcurrentHashMap<>();
+
+    /**
+     * Loads (and caches) the image at the given path. The first call for a
+     * given path reads from disk; every subsequent call for that same path
+     * returns the same cached BufferedImage instance.
+     *
+     * On IOException (e.g. missing file), preserves the original behavior:
+     * prints the stack trace and yields a null image. Note: a null result
+     * is NOT cached (Map.computeIfAbsent never stores null), so a
+     * consistently-missing file will retry the disk read - and re-print the
+     * stack trace - on every call, exactly as the pre-caching code did.
+     */
+    static BufferedImage loadImage(String path) {
+        return imageCache.computeIfAbsent(path, Card::readImageFromDisk);
+    }
+
+    private static BufferedImage readImageFromDisk(String path) {
+        try {
+            return ImageIO.read(new File(path));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     @Override
     public void render(Graphics g) {
         /*
@@ -60,12 +97,7 @@ public class Card extends GameObject {
         */
         String imgString = "img/" + value.getShortVal() + suit.getLetter() + ".png";
 
-        BufferedImage img = null;
-        try {
-            img = ImageIO.read(new File(imgString));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        BufferedImage img = loadImage(imgString);
 
         g.drawImage(img, x, y, WIDTH, HEIGHT, null);
         //g.drawString(toString(), x, y);
