@@ -20,7 +20,6 @@ go-ahead → push.
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 1 | Trick-state indicators (leader, led suit, high card) | ready | S/M | `game-designer` spec → `senior-frontend-developer` |
 | 2 | In-window round & game-flow UX (transitions, click-to-continue, outcome banner) | ready | M/L | `game-designer` spec → `senior-frontend-developer` |
 | 3 | Invalid-move on-screen feedback | ready | S/M | `game-designer` (treatment) → `senior-frontend-developer` |
 | 4 | Start screen + rules/options menu + player name input | ready | M/L | `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer` |
@@ -29,6 +28,7 @@ go-ahead → push.
 | 7 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
 | 8 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
 | 9 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+| 10 | In-game legend for trick-state indicator symbols | blocked (needs 4) | S | `game-designer` → `senior-frontend-developer` |
 
 ## Big picture: eliminate the terminal
 
@@ -44,37 +44,6 @@ Treat this as the throughline when scoping any of those items, not just a
 description of each in isolation.
 
 ## Queue
-
-### 1. Trick-state indicators (leader, led suit, high card) — `ready` — S/M — `game-designer` spec → `senior-frontend-developer`
-Grew from a smaller trick-leader-only item after user feedback 2026-07-02;
-now covers three related pieces of trick state a player has to mentally
-track today, all worth designing as one pass since they render at the same
-place/time (during betting and through a trick):
-
-- **Trick leader**: during betting it's hard to tell who will lead the
-  trick. Add a small on-screen symbol next to the current trick-leader's
-  name/HUD position (candidates: black diamond, circle, triangle — user is
-  open to any easy-to-render shape), visible during betting and carried
-  through play.
-- **Led suit**: once a trick is underway, there's no at-a-glance indication
-  of which suit was led, which is exactly the information the human needs to
-  know which of their own cards are legal follows.
-- **High card**: the current highest-valued card played in the trick so far
-  should be highlighted/indicated in some way, so a player can tell whether
-  their card would actually win before committing to it.
-
-User floated two layout directions — a central UI element consolidating all
-three, or indicators scattered near their respective on-screen areas (e.g.
-next to each played card / each player's HUD), and thought scattered "might
-be more intuitive" but left the call to `game-designer`. No longer
-low-ambiguity enough for a quick confirm-only pass (as the original
-leader-only version was scoped) — needs a real `game-designer` spec
-covering symbol/highlight choice and placement for all three pieces
-together.
-
-Sequenced first now that the thread model fix (former queue #1, see
-`DONE.md`) is done — small and independent of the "eliminate the terminal"
-cluster below, a quick win before the larger UI lift in item 2.
 
 ### 2. In-window round & game-flow UX — `ready` — M/L — `game-designer` spec → `senior-frontend-developer`
 Merged 2026-07-02 from three previously separate queue items — round-
@@ -192,6 +161,14 @@ a concrete list of what changes (build command, test invocation, CLAUDE.md,
 every file's package/import) before touching any files — not attempt the
 migration inline with unrelated work.
 
+### 10. In-game legend for trick-state indicator symbols — `blocked` (needs 4) — S — `game-designer` → `senior-frontend-developer`
+Flagged as a gap during item 1's design spec (2026-07-02, shipped — see
+`DONE.md`): none of the three indicators (trick-leader dot, led-suit HUD
+line, high-card ring) explain themselves to a new player on first sight.
+Natural home is the rules/instructions view being built in item 4, so this
+is blocked on item 4 (needs the rules view to exist as a place to put the
+legend).
+
 ---
 
 ## Notes
@@ -212,6 +189,14 @@ migration inline with unrelated work.
   reprioritized around the "eliminate the terminal" theme. Old item numbers
   from before this reorg are not preserved here — consult git history or
   `DONE.md` if you need the prior numbering.
+- Item 10 (in-game legend for trick-state indicator symbols) added
+  2026-07-02, per user request, after `game-designer`'s spec pass on item 1
+  flagged the gap. Blocked on both item 1 and item 4.
+- Item 1 (trick-state indicators) shipped and moved to `DONE.md` on
+  2026-07-02 (commit `c23ff0f`), unblocking item 10's dependency on it (still
+  blocked on item 4). Placement needed several rounds of live-testing
+  feedback beyond the initial `game-designer` spec — see `DONE.md` for what
+  changed and why.
 
 ## Process notes
 

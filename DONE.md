@@ -85,6 +85,37 @@ across both self-join and external-join paths (zero hangs). New
 `TestHandler.java` (4 tests) and 2 new `TestGame.java` tests. Commit
 `fae32e5`.
 
+### 1. Trick-state indicators (leader, led suit, high card) — done, not yet pushed
+Three indicators, one `game-designer` spec pass covering all three since
+they render at the same place/time: a black dot marking the current trick
+leader, a "Led: [suit]" HUD line for the trick-in-progress, and a gold ring
+around the current highest-valued card, recomputed incrementally as each
+card lands (reusing `Round.determineTrickWinner`/`isHigher`, not new
+comparison logic). Commit `c23ff0f`.
+
+Approved design placed the leader dot above-left of each player's name and
+sized the high-card ring at a 16-18px offset. Live testing (this project's
+actual QA loop — see the "Process notes" section below and the session's
+own retrospective in memory) surfaced pixel-collision bugs the design
+spec's arithmetic didn't catch, fixed over several rounds:
+- Leader dot moved from an above/left offset (collided with the "Led:" line
+  one row above; risked left-edge clipping for the leftmost AI seat at x=0)
+  to `FontMetrics`-measured placement immediately right of the name text —
+  robust to name length and screen position by construction.
+- High-card ring shrank (offset 16-18 → 13-14) and the AI-played card's
+  vertical offset from its name widened (+20 → +30, with the AI's
+  trickScore/score lines pushed from +150/+170 to +165/+185) to give the
+  ring real clearance from surrounding text on both sides, not a ~2px gap.
+- Per a followup request, the whole human HUD block (name, Led: line,
+  bet/tricks, score) moved from beside the human's hand to sit next to the
+  trump card instead, since that reads as more related information.
+
+Also fixed one build-hygiene issue hit mid-session, unrelated to this
+feature's logic: a fast kill/recompile/relaunch cycle left a stale `build/`
+missing a regenerated class file (`NoClassDefFoundError` on a switch-over-
+enum synthetic class), not caught by `javac` as a compile error. Resolved
+with a clean rebuild; `CLAUDE.md`'s Build section now calls this out.
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.
