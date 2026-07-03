@@ -20,15 +20,15 @@ go-ahead → push.
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 2 | In-window round & game-flow UX (transitions, click-to-continue, outcome banner) | ready | M/L | `game-designer` spec → `senior-frontend-developer` |
-| 3 | Invalid-move on-screen feedback | ready | S/M | `game-designer` (treatment) → `senior-frontend-developer` |
-| 4 | Start screen + rules/options menu + player name input | ready | M/L | `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer` |
-| 5 | Play again (in-window restart) | blocked (needs 2) | S/M | `senior-frontend-developer` + `senior-backend-developer` |
-| 6 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
-| 7 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
-| 8 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
-| 9 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
-| 10 | In-game legend for trick-state indicator symbols | blocked (needs 4) | S | `game-designer` → `senior-frontend-developer` |
+| 1 | In-window round & game-flow UX (transitions, click-to-continue, outcome banner) | ready | M/L | `game-designer` spec → `senior-frontend-developer` |
+| 2 | Invalid-move on-screen feedback | ready | S/M | `game-designer` (treatment) → `senior-frontend-developer` |
+| 3 | Start screen + rules/options menu + player name input | ready | M/L | `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer` |
+| 4 | Play again (in-window restart) | blocked (needs 1) | S/M | `senior-frontend-developer` + `senior-backend-developer` |
+| 5 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
+| 6 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
+| 7 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
+| 8 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+| 9 | In-game legend for trick-state indicator symbols | blocked (needs 3) | S | `game-designer` → `senior-frontend-developer` |
 
 ## Big picture: eliminate the terminal
 
@@ -38,14 +38,14 @@ render in the window. The two console-input points that used to block this
 (bet validation, bet entry) are already gone — see `DONE.md` items 4-5.
 Remaining terminal touchpoints, each tracked below: round-transition/score/
 winner messages, the click-to-continue cue, and the outcome banner (all
-folded into item 2); invalid-move feedback (item 3); startup/rules text and
-name entry (item 4); and restarting without relaunching the process (item 5).
+folded into item 1); invalid-move feedback (item 2); startup/rules text and
+name entry (item 3); and restarting without relaunching the process (item 4).
 Treat this as the throughline when scoping any of those items, not just a
 description of each in isolation.
 
 ## Queue
 
-### 2. In-window round & game-flow UX — `ready` — M/L — `game-designer` spec → `senior-frontend-developer`
+### 1. In-window round & game-flow UX — `ready` — M/L — `game-designer` spec → `senior-frontend-developer`
 Merged 2026-07-02 from three previously separate queue items — round-
 transition/score/winner UX, the click-to-continue affordance, and the
 end-of-game outcome screen — because all three render at the same points in
@@ -66,20 +66,20 @@ same transition code three separate times:
   normal play).
 
 Note: "play again" (in-window restart) is deliberately **not** included here
-— see item 5.
+— see item 4.
 
-### 3. Invalid-move on-screen feedback — `ready` — S/M — `game-designer` (treatment) → `senior-frontend-developer`
+### 2. Invalid-move on-screen feedback — `ready` — S/M — `game-designer` (treatment) → `senior-frontend-developer`
 When the player attempts an illegal move (e.g. a card that doesn't follow
 suit), there's no on-screen indication the move was rejected. User suggested
 a fading red message but is open to whatever `game-designer` recommends
 (border flash, shake, etc.) — needs a design call on exact treatment before
 implementation.
 
-Independent of item 2 (different trigger point — an illegal move attempt,
+Independent of item 1 (different trigger point — an illegal move attempt,
 not trick/round resolution) but same "eliminate the terminal" theme;
-sequenced after item 2 since it's the smaller, more isolated fix of the two.
+sequenced after item 1 since it's the smaller, more isolated fix of the two.
 
-### 4. Start screen + rules/options menu + player name input — `ready` — M/L — `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer`
+### 3. Start screen + rules/options menu + player name input — `ready` — M/L — `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer`
 No start screen exists today — the game launches straight into play with
 the human hardcoded as "Jacob." Add a start screen with a rules/instructions
 view (also reachable mid-game, not just pre-launch) and a name-entry field,
@@ -89,24 +89,24 @@ versus what gets deferred to a later dedicated options-menu pass. Name entry
 touches `Player`/`Game` setup, hence the `senior-backend-developer`
 co-assignment alongside the frontend screen work.
 
-Sequenced after the higher-frequency in-game fixes (items 2-3) since a start
+Sequenced after the higher-frequency in-game fixes (items 1-2) since a start
 screen is encountered once per session, not once per trick.
 
-### 5. Play again (in-window restart) — `blocked` (needs 2) — S/M — `senior-frontend-developer` + `senior-backend-developer`
+### 4. Play again (in-window restart) — `blocked` (needs 1) — S/M — `senior-frontend-developer` + `senior-backend-developer`
 Split out of the old end-of-game item 2026-07-02: showing the outcome (item
-2c) and restarting the game are different capabilities. This one needs
+1c) and restarting the game are different capabilities. This one needs
 actual game-lifecycle/restart logic (re-initializing `Game`/`Round` state
 without relaunching the process), not just a rendering addition. Blocked on
-item 2 landing first, since "play again" needs an outcome screen to attach
+item 1 landing first, since "play again" needs an outcome screen to attach
 its button to.
 
-### 6. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
+### 5. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
 `AI_Zombie` is unused but functional (always plays first legal card) — a
 natural "easy" difficulty tier if a difficulty picker lands; do not delete
 it. Candidates: smarter betting/strategy, opponent card-count display
-(overlaps item 2), play animations.
+(overlaps item 1), play animations.
 
-### 7. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
+### 6. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
 monitor to a secondary monitor with a different Windows display-scale
 factor causes blurry/stretched rendering. Root cause: the game renders via a
@@ -123,13 +123,13 @@ Swing's more DPI-aware repaint pipeline.
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
-### 8. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
+### 7. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
 Added 2026-07-02 per user request: "much later down the line," a full
 visual/art overhaul of the game beyond the functional UI fixes above.
-Intentionally deferred — revisit once the functional/UX backlog (items 1-6)
+Intentionally deferred — revisit once the functional/UX backlog (items 1-5)
 is in a good place; scoping it now would be premature.
 
-### 9. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
+### 8. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
 Added 2026-07-02 per user request, **explicitly planning-only — do not
 implement yet**. The current `src/` layout is flat: all production and test
 `.java` files live directly under `src/` with no subfolders, a structure the
@@ -161,13 +161,13 @@ a concrete list of what changes (build command, test invocation, CLAUDE.md,
 every file's package/import) before touching any files — not attempt the
 migration inline with unrelated work.
 
-### 10. In-game legend for trick-state indicator symbols — `blocked` (needs 4) — S — `game-designer` → `senior-frontend-developer`
-Flagged as a gap during item 1's design spec (2026-07-02, shipped — see
-`DONE.md`): none of the three indicators (trick-leader dot, led-suit HUD
-line, high-card ring) explain themselves to a new player on first sight.
-Natural home is the rules/instructions view being built in item 4, so this
-is blocked on item 4 (needs the rules view to exist as a place to put the
-legend).
+### 9. In-game legend for trick-state indicator symbols — `blocked` (needs 3) — S — `game-designer` → `senior-frontend-developer`
+Flagged as a gap during the trick-state indicators' design spec (2026-07-02,
+shipped — see `DONE.md`): none of the three indicators (trick-leader dot,
+led-suit HUD line, high-card ring) explain themselves to a new player on
+first sight. Natural home is the rules/instructions view being built in
+item 3, so this is blocked on item 3 (needs the rules view to exist as a
+place to put the legend).
 
 ---
 
@@ -189,14 +189,14 @@ legend).
   reprioritized around the "eliminate the terminal" theme. Old item numbers
   from before this reorg are not preserved here — consult git history or
   `DONE.md` if you need the prior numbering.
-- Item 10 (in-game legend for trick-state indicator symbols) added
-  2026-07-02, per user request, after `game-designer`'s spec pass on item 1
-  flagged the gap. Blocked on both item 1 and item 4.
-- Item 1 (trick-state indicators) shipped and moved to `DONE.md` on
-  2026-07-02 (commit `c23ff0f`), unblocking item 10's dependency on it (still
-  blocked on item 4). Placement needed several rounds of live-testing
-  feedback beyond the initial `game-designer` spec — see `DONE.md` for what
-  changed and why.
+- Queue renumbered again 2026-07-02 (same day), after the trick-state
+  indicators item shipped (commit `c23ff0f`) and was moved to `DONE.md`:
+  old items 2-10 became new items 1-9 (old #2 → new #1, old #3 → new #2, ...,
+  old #10 → new #9; old #1 removed), same pattern as the renumbering above.
+  The new item 9 (in-game legend) was added just before this renumbering, per
+  user request, after `game-designer`'s spec pass on the trick-state
+  indicators flagged the gap; it's blocked on item 3 (start screen/rules
+  view existing as a place to put the legend).
 
 ## Process notes
 
