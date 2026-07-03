@@ -30,20 +30,27 @@ that item — this is "skip by default," not "never run."
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 1 | Start screen + rules/options menu + player name input | ready | M/L | `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer` |
-| 2 | Play again (in-window restart) | ready | S/M | `senior-frontend-developer` + `senior-backend-developer` |
-| 3 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
-| 4 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
-| 5 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
-| 6 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
-| 7 | In-game legend for trick-state indicator symbols | blocked (needs 1) | S | `game-designer` → `senior-frontend-developer` |
+| 1 | Play again (in-window restart) | ready | S/M | `senior-frontend-developer` + `senior-backend-developer` |
+| 2 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
+| 3 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
+| 4 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
+| 5 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+| 6 | In-game legend for trick-state indicator symbols | ready | S | `game-designer` → `senior-frontend-developer` |
 
-**Live visual sanity check owed:** invalid-move feedback (`DONE.md` item 2,
-2026-07-03) shipped without the live "launch and look" check this project
-normally relies on — the screen was locked when it was attempted. Next
-session with actual desktop access: click an off-suit card and an early
-trump lead, confirm both messages render/fade correctly, before trusting it
-fully.
+**Live visual sanity checks owed (screen has been locked all session):**
+- Invalid-move feedback (`DONE.md` item 2, 2026-07-03): click an off-suit
+  card and an early trump lead, confirm both messages render/fade correctly.
+- Start screen/rules/name entry (`DONE.md` item 3, 2026-07-03): keyboard
+  focus on first keystroke, a Rules round-trip preserving a partial typed
+  name, the name reaching the HUD, the mid-game Rules hotspot's pixel
+  clearance (x=760-820, y=265-295), and the name rendering correctly in
+  `RoundSummaryPanel`/`GameOverBanner`.
+
+Also noted, not acted on: 3 lingering `java.exe` "Ten to One" processes were
+observed running (2 from 2026-07-03, 1 from 2026-07-02 night) — almost
+certainly idle demo/verification windows sitting at whatever screen they
+ended on (the game-over banner is designed to never auto-exit). Not killed
+without checking, since one may be work in progress.
 
 ## Big picture: eliminate the terminal
 
@@ -53,32 +60,17 @@ render in the window. The two console-input points that used to block this
 (bet validation, bet entry) are already gone — see `DONE.md` items 4-5.
 Round-transition/score/winner messages, the click-to-continue cue, and the
 outcome banner shipped 2026-07-03 (`DONE.md`'s "In-window round &
-game-flow UX" entry), as did invalid-move feedback the same day (`DONE.md`
-item 2) — but the old `System.out.println` calls behind all of these were
-deliberately left in place (they now just duplicate on-screen content)
-rather than removed opportunistically; revisit once the rest of this list is
-in a good place. Remaining terminal touchpoints, each tracked below:
-startup/rules text and name entry (item 1); and restarting without
-relaunching the process (item 2). Treat this as the throughline when
-scoping any of those items, not just a description of each in isolation.
+game-flow UX" entry), as did invalid-move feedback and the start screen/
+rules/name-entry item the same day (`DONE.md` items 2-3) — but the old
+`System.out.println` calls behind all of these were deliberately left in
+place (they now just duplicate on-screen content) rather than removed
+opportunistically; revisit once the rest of this list is in a good place.
+The only remaining terminal touchpoint tracked below is restarting without
+relaunching the process (item 1).
 
 ## Queue
 
-### 1. Start screen + rules/options menu + player name input — `ready` — M/L — `game-designer` spec → `senior-frontend-developer` + `senior-backend-developer`
-No start screen exists today — the game launches straight into play with
-the human hardcoded as "Jacob." Add a start screen with a rules/instructions
-view (also reachable mid-game, not just pre-launch) and a name-entry field,
-likely the seed of a fuller options menu later. Large and open-ended enough
-that `game-designer` should scope an MVP (start screen + rules + name entry)
-versus what gets deferred to a later dedicated options-menu pass. Name entry
-touches `Player`/`Game` setup, hence the `senior-backend-developer`
-co-assignment alongside the frontend screen work.
-
-Sequenced ahead of the smaller remaining fixes since a start screen is
-encountered once per session, but it's the last big open-ended item before
-the "eliminate the terminal" backlog is essentially done.
-
-### 2. Play again (in-window restart) — `ready` — S/M — `senior-frontend-developer` + `senior-backend-developer`
+### 1. Play again (in-window restart) — `ready` — S/M — `senior-frontend-developer` + `senior-backend-developer`
 Split out of the old end-of-game item 2026-07-02: showing the outcome and
 restarting the game are different capabilities. This one needs actual
 game-lifecycle/restart logic (re-initializing `Game`/`Round` state without
@@ -86,13 +78,13 @@ relaunching the process), not just a rendering addition. Was blocked on the
 round/game-flow UX item landing first (needed an outcome screen to attach
 its button to) — unblocked now that it's shipped, see `DONE.md`.
 
-### 3. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
+### 2. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
 `AI_Zombie` is unused but functional (always plays first legal card) — a
 natural "easy" difficulty tier if a difficulty picker lands; do not delete
 it. Candidates: smarter betting/strategy, opponent card-count display,
 play animations.
 
-### 4. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
+### 3. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
 monitor to a secondary monitor with a different Windows display-scale
 factor causes blurry/stretched rendering. Root cause: the game renders via a
@@ -109,13 +101,13 @@ Swing's more DPI-aware repaint pipeline.
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
-### 5. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
+### 4. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
 Added 2026-07-02 per user request: "much later down the line," a full
 visual/art overhaul of the game beyond the functional UI fixes above.
-Intentionally deferred — revisit once the functional/UX backlog (items 1-3)
+Intentionally deferred — revisit once the functional/UX backlog (items 1-2)
 is in a good place; scoping it now would be premature.
 
-### 6. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
+### 5. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
 Added 2026-07-02 per user request, **explicitly planning-only — do not
 implement yet**. The current `src/` layout is flat: all production and test
 `.java` files live directly under `src/` with no subfolders, a structure the
@@ -147,13 +139,16 @@ a concrete list of what changes (build command, test invocation, CLAUDE.md,
 every file's package/import) before touching any files — not attempt the
 migration inline with unrelated work.
 
-### 7. In-game legend for trick-state indicator symbols — `blocked` (needs 1) — S — `game-designer` → `senior-frontend-developer`
+### 6. In-game legend for trick-state indicator symbols — `ready` — S — `game-designer` → `senior-frontend-developer`
 Flagged as a gap during the trick-state indicators' design spec (2026-07-02,
 shipped — see `DONE.md`): none of the three indicators (trick-leader dot,
 led-suit HUD line, high-card ring) explain themselves to a new player on
-first sight. Natural home is the rules/instructions view being built in
-item 1, so this is blocked on item 1 (needs the rules view to exist as a
-place to put the legend).
+first sight. Was blocked on the rules/instructions view existing as a place
+to put it — unblocked now that `RulesView` has shipped with a reserved,
+measured-but-empty legend slot waiting for exactly this
+(`RulesView.LEGEND_TOP`/`LEGEND_BOTTOM`/`CONTENT_LEFT`/`CONTENT_RIGHT`, see
+`DONE.md`'s start-screen entry) — implementer should draw into that slot,
+not invent new bounds.
 
 ---
 
@@ -201,6 +196,14 @@ place to put the legend).
   → new #7; old #1 removed), same pattern as prior renumberings. This is
   the point where the "eliminate the terminal" backlog is down to just the
   start screen and play-again items.
+- Queue renumbered again 2026-07-03 (same day), after the start screen/
+  rules view/name entry item shipped and moved to `DONE.md` — old items 2-7
+  became new items 1-6 (old #2 → new #1, ..., old #7 → new #6; old #1
+  removed), same pattern as prior renumberings. This also unblocked the
+  in-game legend item (old #7, new #6), which was waiting on the rules view
+  existing — it's now `ready`, and shipped with a reserved, pixel-measured
+  empty slot for the legend to draw into. The "eliminate the terminal"
+  backlog is now down to just the play-again item.
 
 ## Process notes
 

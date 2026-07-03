@@ -21,30 +21,25 @@ public class Game extends Canvas implements Runnable{
     private volatile boolean running = false;
     private final Handler handler;
     private final MouseInput mouseInput;
+    private final KeyInput keyInput;
 
     private final List<Player> players;
     private int roundIndex;
     private int roundStartingPlayer;
     private final int roundBonus = 10;
 
+    //AI-only: the human's name is captured live via the Start Screen
+    //(captureHumanName), not passed in as a list slot -- see the constructor.
     private static final List<String> names = new ArrayList<>() {{
-        add("Jacob");
+        add("Player One");
         add("Player Two");
         add("Player Three");
         add("Player Four");
-        add("Player Five");
     }};
 
     public Game() {
         this(names);
     }
-
-    /*
-    public Game(int numPlayers) {
-        assert numPlayers <= 5 : "You cannot have more than 5 players";
-        this(names.subList(0, numPlayers));
-    }
-    */
 
     /**
      * Split out from the constructor so tests can skip popping a real
@@ -56,27 +51,80 @@ public class Game extends Canvas implements Runnable{
         new Window(WIDTH, HEIGHT, "Ten to One", this);
     }
 
-    public Game(List<String> playerNames) {
+    public Game(List<String> aiNames) {
         handler = new Handler();
         mouseInput = new MouseInput();
+        keyInput = new KeyInput();
         this.addMouseListener(mouseInput);
+        this.addKeyListener(keyInput);
+        this.setFocusable(true);
         buildWindow();
 
         //handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
 
-        int numPlayers = playerNames.size();
+        String humanName = captureHumanName(aiNames);
+
+        int numPlayers = aiNames.size() + 1;
         assert numPlayers <= 5 : "You cannot have more than 5 players";
 
-
         players = new ArrayList<>();
-        players.add(new Human(playerNames.get(0), mouseInput, handler));
-        //players.add(new Human(playerNames.get(1), mouseInput));
-        for (int i = 1; i < numPlayers; i++) {
-            players.add(new AI_Easy(playerNames.get(i)));
+        players.add(new Human(humanName, mouseInput, handler));
+        for (String aiName : aiNames) {
+            players.add(new AI_Easy(aiName));
         }
         roundIndex = 0;
         Random r = new Random();
         roundStartingPlayer = r.nextInt(numPlayers);
+    }
+
+    /**
+     * New seam (ROADMAP item 1, backend half), package-private and
+     * non-final -- mirrors buildWindow()'s existing testability seam so a
+     * test subclass can override it to a canned name instead of blocking on
+     * a real click nothing in a test ever delivers. Called right after
+     * buildWindow() has made the frame visible, before any Player is
+     * constructed.
+     */
+    String captureHumanName(List<String> aiNames) {
+        return runStartScreen(aiNames);
+    }
+
+    /**
+     * Blocking click-loop for the pre-launch Start Screen. Reuses the same
+     * StartScreen instance across a Rules round-trip (nested RulesView is
+     * shown on top via its own showBlocking call, then this loop resumes) so
+     * a partially-typed name survives visiting Rules and coming back.
+     */
+    private String runStartScreen(List<String> aiNames) {
+        StartScreen startScreen = new StartScreen();
+        handler.addObject(startScreen);
+        keyInput.setTarget(startScreen);
+        this.requestFocusInWindow();
+        try {
+            mouseInput.clearClicks();
+            while (true) {
+                Point click = mouseInput.awaitClick();
+                StartScreen.Control control = startScreen.controlAt(click.x, click.y);
+                if (control == null) {
+                    continue;
+                }
+                switch (control) {
+                    case RULES:
+                        RulesView.showBlocking(handler, mouseInput);
+                        mouseInput.clearClicks();
+                        continue;
+                    case START:
+                        String typedName = startScreen.getName().trim();
+                        if (!typedName.isEmpty()) {
+                            return typedName;
+                        }
+                        continue;
+                }
+            }
+        } finally {
+            handler.removeObject(startScreen);
+            keyInput.setTarget(null);
+        }
     }
 
     private int numCardsThisRound() {

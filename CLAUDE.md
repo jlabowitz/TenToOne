@@ -28,11 +28,12 @@ size and avoids the failure mode entirely.
 
 ## Test
 
-Tests are JUnit 4 (`TestGame.java`, `TestHand.java`), run via `JUnitCore` —
-there's no test runner script.
+Tests are JUnit 4, run via `JUnitCore` — there's no test runner script. There
+are 16 test classes (`src/Test*.java`); list them yourself with a glob rather
+than trusting this count if files have been added/removed since:
 
 ```
-"/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot/bin/java.exe" -cp "build;lib/*" org.junit.runner.JUnitCore TestGame TestHand
+"/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot/bin/java.exe" -cp "build;lib/*" org.junit.runner.JUnitCore TestBetStepper TestCard TestGame TestHand TestHandler TestHumanBet TestHumanIllegalReason TestIllegalPlayFeedback TestKeyInput TestNextTrickPrompt TestPlayer TestRound TestRulesView TestStartScreen TestTrick TestWindowSizing
 ```
 
 ## Run the game

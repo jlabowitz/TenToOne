@@ -8,8 +8,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class TestGame {
+    //AI-only, since the human's name is now captured via the Start Screen
+    //flow (captureHumanName), not passed in as a list slot -- see
+    //HeadlessGame.captureHumanName below.
     private static final List<String> HEADLESS_PLAYER_NAMES = new ArrayList<>() {{
-        add("You");
         add("Bot");
     }};
 
@@ -23,8 +25,8 @@ public class TestGame {
      * without touching the thread-lifecycle logic under test.
      */
     private static class HeadlessGame extends Game {
-        HeadlessGame(List<String> playerNames) {
-            super(playerNames);
+        HeadlessGame(List<String> aiNames) {
+            super(aiNames);
         }
 
         @Override
@@ -38,6 +40,19 @@ public class TestGame {
             //nothing is ever shown on screen and start()/stop() stay under
             //this test's manual control.
             Window.buildFrame(WIDTH, HEIGHT, "Ten to One", this);
+        }
+
+        /**
+         * Skips the real Start Screen's blocking click-loop -- nothing in a
+         * test ever delivers a click, so without this override every test
+         * that constructs a HeadlessGame would hang forever at construction
+         * time waiting on mouseInput.awaitClick(). Canned name mirrors
+         * HEADLESS_PLAYER_NAMES' old human-name slot ("You") so existing
+         * assertions keyed on that name don't need to change.
+         */
+        @Override
+        String captureHumanName(List<String> aiNames) {
+            return "You";
         }
     }
 
@@ -166,6 +181,29 @@ public class TestGame {
         assertFalse("bet != tricksTaken must not count as a bonus hit", botRow.bonusHit);
         assertEquals(4, botRow.roundDelta); // tricksTaken only, no bonus
         assertEquals(4, botRow.totalAfter);
+    }
+
+    /**
+     * Regression/spec test for the new captureHumanName seam (ROADMAP item
+     * 1, backend half): proves the override path is actually exercised at
+     * construction time -- a distinct name (not the default "You" canned
+     * value HeadlessGame otherwise returns) must end up as the Human
+     * player's name, and the human must still be seated first ahead of the
+     * AI players built from aiNames.
+     */
+    @Test
+    public void captureHumanNameOverrideDeterminesHumanPlayerName() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES) {
+            @Override
+            String captureHumanName(List<String> aiNames) {
+                return "Distinctly Named";
+            }
+        };
+
+        Player human = game.getPlayers().get(0);
+        assertEquals("Distinctly Named", human.getName());
+        assertEquals(ID.HUMAN, human.getID());
+        assertEquals("Bot", game.getPlayers().get(1).getName());
     }
 
     /** The hand persists between rounds, so every round must re-position it. */

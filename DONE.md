@@ -191,6 +191,61 @@ seen the message render. **Next session should do a 10-second sanity check**
 (deliberately click an off-suit card and an early trump lead, confirm both
 messages appear and fade correctly) before this is fully trusted.
 
+### 3. Start screen + rules view + player name input — done, not yet pushed, **not yet visually confirmed**
+Three parts per `game-designer`'s MVP scope call: a combined **Start Screen**
+(title, name field, Rules button, Start Game button — one screen, not two),
+a shared **Rules View** reachable both pre-launch and mid-game (via a new
+hotspot on the existing `NextTrickPrompt`, so item 7's legend has a home
+without any later restructuring), and **name entry** replacing the hardcoded
+`"Jacob"`. Deliberately deferred to a future options-menu pass: player-count/
+difficulty selection, Enter-to-submit, and validation feedback on an
+empty-name submit (silently ignored, matching `BetStepper`'s existing
+invalid-input convention) — flagged as a UX-feel watch-item for a future
+live playtest, not fixed preemptively.
+
+New classes: `StartScreen`, `RulesView`, `TypingTarget`/`KeyInput` (this
+codebase's first-ever keyboard input plumbing, mirroring `MouseInput`'s
+`extends *Adapter` shape). `Game`'s constructor signature changed
+(`List<String> playerNames` → `List<String> aiNames` — the human is no
+longer a list slot, captured live via the new `captureHumanName`/
+`runStartScreen` seam instead) and its static AI name list dropped from 5 to
+4 entries (`"Jacob"` removed, human seated first regardless). `Human.
+nextTrick()` now loops to check the Rules hotspot instead of a single
+blocking click. `CLAUDE.md`'s Test section corrected to list all 16 test
+classes (previously only named 2, stale since well before this session).
+
+**`MAX_NAME_LENGTH` measured at 13, not the design spec's illustrative 16**
+— confirmed via real `FontMetrics` against `RoundSummaryPanel`'s actual name
+column and the codebase's actual default font, independently re-verified by
+both `senior-code-reviewer` and `senior-qa-backend`.
+
+Per this project's reduced-flow default, this item was judged risky enough
+(a `Game` constructor/lifecycle signature change, plus new cross-thread
+key-event plumbing) to route through `senior-code-reviewer` and
+`senior-qa-backend` rather than skip them — the one item so far in this
+backlog to get that treatment. Review caught one real, previously-latent
+bug: `keyInput`'s target reference to a discarded `StartScreen` was never
+cleared, fixed by adding `keyInput.setTarget(null)` to `runStartScreen()`'s
+cleanup `finally`. QA traced (not just empirically tested) that no
+construction path can reach the real blocking `runStartScreen()` call in
+`HeadlessGame`, and ran the full suite 11 times (113/113 passing every run,
+zero flakes) — separately confirmed once more from a clean rebuild in this
+session, same result.
+
+**Caveat, same shape as the invalid-move-feedback item above:** the live
+"launch and look" check — 5 planned checkpoints (start-screen keyboard focus
+timing, a Rules round-trip preserving a partial name, the name reaching the
+HUD, the mid-game Rules hotspot's pixel clearance, and the name rendering
+correctly in `RoundSummaryPanel`/`GameOverBanner`) — has not happened yet.
+The screen was locked on every attempt this session (implementer, then this
+session's own follow-up check). Confidence rests on clean compile, 113/113
+tests, and two independent code traces (review + QA), not on having seen
+any of it run. **Next session should walk all 5 checkpoints** before fully
+trusting this, in particular the two the design spec flagged as pure
+estimates rather than measurements: whether typing registers the instant
+the Start Screen appears, and whether the Rules hotspot (x=760-820,
+y=265-295) actually clears the click-to-continue text and hand rendering.
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.

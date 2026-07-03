@@ -15,10 +15,22 @@ import java.awt.*;
  * ~12px clearance above and ~21px below, and this band is empty of every
  * other on-screen element (AI cards y=80-180, human's played card
  * y=330-430, human's hand y=480-580) regardless of player count/hand size.
+ *
+ * ROADMAP item 1: also renders a small "Rules" hotspot in the same
+ * verified-clear band, top-right of it and away from the centered prompt
+ * text, so RulesView.showBlocking() can be reached mid-game from
+ * Human.nextTrick() (wired up by the backend pass, not this class). This
+ * hotspot's horizontal slot (x=760-820) is a design-time estimate, not
+ * pixel-verified live -- flagged in this item's completion report; it can
+ * only be exercised in the running game once the backend pass wires
+ * Human.nextTrick() to check isRulesHotspot().
  */
 public class NextTrickPrompt extends GameObject {
     private static final String TEXT = "Click anywhere to move on to the next trick.";
     private static final int BASELINE_Y = 280;
+    private static final String RULES_LABEL = "Rules";
+    private static final int RULES_TOP = 265, RULES_BOTTOM = 295;
+    private static final int RULES_LEFT = 760, RULES_RIGHT = 820;
 
     @Override
     public void tick() {
@@ -36,5 +48,20 @@ public class NextTrickPrompt extends GameObject {
         g.drawString(TEXT, x, BASELINE_Y);
 
         g.setFont(defaultFont);
+        g.setColor(Color.BLACK);
+        g.drawRect(RULES_LEFT, RULES_TOP, RULES_RIGHT - RULES_LEFT - 1, RULES_BOTTOM - RULES_TOP - 1);
+        FontMetrics defaultMetrics = g.getFontMetrics();
+        int labelWidth = defaultMetrics.stringWidth(RULES_LABEL);
+        int labelX = RULES_LEFT + ((RULES_RIGHT - RULES_LEFT) - labelWidth) / 2;
+        g.drawString(RULES_LABEL, labelX, RULES_BOTTOM - 10);
+    }
+
+    /**
+     * Half-open rect hit-test, same convention as BetStepper.controlAt.
+     * Named isRulesHotspot (not controlAt) since this GameObject has only
+     * one clickable extra control, not a small fixed enum of them.
+     */
+    public boolean isRulesHotspot(int px, int py) {
+        return px >= RULES_LEFT && px < RULES_RIGHT && py >= RULES_TOP && py < RULES_BOTTOM;
     }
 }

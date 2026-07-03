@@ -108,7 +108,15 @@ public class Human extends Player{
         handler.addObject(prompt);
         try {
             mouseInput.clearClicks();
-            mouseInput.awaitClick();
+            while (true) {
+                Point click = mouseInput.awaitClick();
+                if (prompt.isRulesHotspot(click.x, click.y)) {
+                    RulesView.showBlocking(handler, mouseInput);
+                    mouseInput.clearClicks();
+                    continue;
+                }
+                return;
+            }
         } finally {
             handler.removeObject(prompt);
         }
