@@ -116,6 +116,45 @@ missing a regenerated class file (`NoClassDefFoundError` on a switch-over-
 enum synthetic class), not caught by `javac` as a compile error. Resolved
 with a clean rebuild; `CLAUDE.md`'s Build section now calls this out.
 
+### 1. In-window round & game-flow UX — done, not yet pushed
+Three sub-parts, one `game-designer` spec pass covering all three since they
+render at the same points in the game loop (trick resolves → round ends →
+game ends): (a) a round-transition/score-summary modal (scrim + centered
+panel showing each player's bet/tricks/round delta/running total, gold
+"(bonus!)" highlighting when bet == tricks taken), (b) a bold click-to-
+continue text prompt placed in a verified-clear band between the AI row and
+the trump card (existing blocking point in `Human.nextTrick()`, unchanged
+trigger), (c) a permanent end-of-game outcome banner (win/lose title, final
+standings sorted by score, an explicit "close this window to exit" footer
+so the frozen final frame doesn't read as hung).
+
+New classes: `RoundResultRow` (pure data), `ModalOverlay` (shared scrim/
+panel/font base for (a)/(c)), `RoundSummaryPanel`, `GameOverBanner`,
+`NextTrickPrompt`. `Game.mouseInput` promoted from constructor-local to a
+field; `Human.nextTrick()` gained a `try/finally` around its existing
+blocking wait. `snapshotRoundResults()`/`applyTotals()` snapshot each
+player's bet/tricksTaken *before* `adjustScores()` resets `trickScore` to 0
+— a data-lifecycle gotcha the design spec flagged explicitly.
+
+Per this project's reduced-flow default (review/QA opt-in, not automatic —
+see `ROADMAP.md`'s cadence-override note), this shipped without a separate
+`senior-code-reviewer`/`senior-qa-frontend` pass: the implementer
+self-verified via 64/64 passing unit tests (new
+`TestGame.snapshotRoundResultsCapturesBonusHitBoundary`, TDD'd against the
+bonus-hit boundary) plus a throwaway reflection-driven harness that drove
+real `MouseEvent`s through the actual rendering pipeline and screenshotted
+all three trigger points (both bonus/non-bonus round-summary branches, both
+win/lose banner branches) via `Robot` — confirmed no pixel collisions,
+deleted before finishing since it wasn't part of the shipped diff. User
+separately hands-on played a shortened game (skip-ahead-to-round-9 launcher,
+also throwaway) through to the outcome banner and confirmed it looked right.
+
+Old console `System.out.println` calls (scores, "won the trick", etc.) were
+deliberately left in place — the spec didn't ask for their removal and
+removing them wasn't attempted opportunistically. They now duplicate what's
+on screen; flagged as a likely target once the "eliminate the terminal"
+goal is revisited, not fixed here.
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.

@@ -5,6 +5,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class TestGame {
     private static final List<String> HEADLESS_PLAYER_NAMES = new ArrayList<>() {{
@@ -113,6 +114,58 @@ public class TestGame {
 
         assertEquals(Game.WIDTH, human.getHand().getX());
         assertEquals(Game.HEIGHT - 150, human.getHand().getY());
+    }
+
+    /**
+     * Regression/spec test for the round-summary data snapshot (ROADMAP item
+     * 1a): bet/tricksTaken must be captured before adjustScores() resets
+     * trickScore to 0, bonusHit/roundDelta must reuse the same equality
+     * check adjustScores() itself uses, and totalAfter must reflect the
+     * score *after* adjustScores() has actually run. Exercises both sides of
+     * the bonus-hit boundary in one round: one player bets exactly what they
+     * take (bonus), the other doesn't (no bonus).
+     */
+    @Test
+    public void snapshotRoundResultsCapturesBonusHitBoundary() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        List<Player> players = game.getPlayers();
+        Player human = players.get(0); // "You" -- Game always seats the human first
+        Player bot = players.get(1); // "Bot"
+
+        human.setBet(3);
+        for (int i = 0; i < 3; i++) {
+            human.wonTrick();
+        }
+        bot.setBet(2);
+        for (int i = 0; i < 4; i++) {
+            bot.wonTrick();
+        }
+
+        int roundBonus = 10;
+        List<RoundResultRow> results = Game.snapshotRoundResults(players, roundBonus);
+
+        game.adjustScores();
+        Game.applyTotals(results, players);
+
+        RoundResultRow humanRow = results.get(0);
+        assertEquals("You", humanRow.name);
+        assertTrue(humanRow.isHuman);
+        assertEquals(3, humanRow.bet);
+        assertEquals(3, humanRow.tricksTaken);
+        assertTrue("bet == tricksTaken must count as a bonus hit", humanRow.bonusHit);
+        assertEquals(13, humanRow.roundDelta); // tricksTaken (3) + bonus (10)
+        assertEquals(13, humanRow.totalAfter);
+        //bonusHit must not have left trickScore un-reset for later rounds
+        assertEquals(0, human.getTrickScore());
+
+        RoundResultRow botRow = results.get(1);
+        assertEquals("Bot", botRow.name);
+        assertFalse(botRow.isHuman);
+        assertEquals(2, botRow.bet);
+        assertEquals(4, botRow.tricksTaken);
+        assertFalse("bet != tricksTaken must not count as a bonus hit", botRow.bonusHit);
+        assertEquals(4, botRow.roundDelta); // tricksTaken only, no bonus
+        assertEquals(4, botRow.totalAfter);
     }
 
     /** The hand persists between rounds, so every round must re-position it. */

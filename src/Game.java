@@ -2,6 +2,7 @@ import java.awt.*;
 import java.awt.image.BufferStrategy;
 import java.io.Serial;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
@@ -19,6 +20,7 @@ public class Game extends Canvas implements Runnable{
     //without relying on stop()'s (now removed) synchronized lock for it.
     private volatile boolean running = false;
     private final Handler handler;
+    private final MouseInput mouseInput;
 
     private final List<Player> players;
     private int roundIndex;
@@ -56,7 +58,7 @@ public class Game extends Canvas implements Runnable{
 
     public Game(List<String> playerNames) {
         handler = new Handler();
-        MouseInput mouseInput = new MouseInput();
+        mouseInput = new MouseInput();
         this.addMouseListener(mouseInput);
         buildWindow();
 
@@ -96,15 +98,24 @@ public class Game extends Canvas implements Runnable{
 
             //handler.removeAll();
 
+            //snapshot bet/tricksTaken before adjustScores() resets each
+            //player's trickScore to 0 -- see RoundResultRow's class doc
+            List<RoundResultRow> results = snapshotRoundResults(getPlayers(), roundBonus);
+
             //adjust scores accordingly
             adjustScores();
             printScores();
+            applyTotals(results, getPlayers());
+
+            showRoundSummary(roundIndex, results);
+
             roundStartingPlayer = nextPlayer(roundStartingPlayer);
             this.roundIndex++;
         }
         //determine winner
         Player winner = determineWinner();
         System.out.println(winner.getName() + " won the game!");
+        showGameOverBanner(winner);
     }
 
     public void adjustScores() {
@@ -122,6 +133,67 @@ public class Game extends Canvas implements Runnable{
         for (Player player : getPlayers()) {
             System.out.println(player.getName() + " has " + player.getScore() + " points.");
         }
+    }
+
+    /**
+     * Captures each player's name/isHuman/bet/tricksTaken before
+     * adjustScores() resets trickScore to 0. Package-private + static so
+     * TestGame can exercise it directly against a scripted bet/trickScore
+     * setup without depending on the rest of play()'s flow.
+     */
+    static List<RoundResultRow> snapshotRoundResults(List<Player> players, int roundBonus) {
+        List<RoundResultRow> rows = new ArrayList<>();
+        for (Player player : players) {
+            rows.add(new RoundResultRow(player.getName(), player.getID() == ID.HUMAN,
+                    player.getBet(), player.getTrickScore(), roundBonus));
+        }
+        return rows;
+    }
+
+    /**
+     * Fills in each row's totalAfter from players' current score, in the
+     * same order snapshotRoundResults() produced rows -- must be called
+     * after adjustScores() has actually run.
+     */
+    static void applyTotals(List<RoundResultRow> rows, List<Player> players) {
+        for (int i = 0; i < rows.size(); i++) {
+            rows.get(i).totalAfter = players.get(i).getScore();
+        }
+    }
+
+    /**
+     * Adds the round-summary modal (ROADMAP item 1a) and blocks until the
+     * player clicks anywhere to dismiss it, same click-anywhere convention
+     * Human.nextTrick() already uses. Removed in a finally, mirroring
+     * BetStepper's add-before/remove-after lifecycle.
+     */
+    private void showRoundSummary(int roundIndex, List<RoundResultRow> results) {
+        RoundSummaryPanel panel = new RoundSummaryPanel(roundIndex, results);
+        handler.addObject(panel);
+        try {
+            mouseInput.clearClicks();
+            mouseInput.awaitClick();
+        } finally {
+            handler.removeObject(panel);
+        }
+    }
+
+    /**
+     * Adds the end-of-game outcome banner (ROADMAP item 1c) and never
+     * removes it -- the render thread keeps drawing the final frame forever
+     * after play() returns, so this is the last thing the player sees.
+     */
+    private void showGameOverBanner(Player winner) {
+        boolean humanWon = getPlayers().stream()
+                .filter(p -> p.getID() == ID.HUMAN)
+                .findFirst()
+                .map(human -> human == winner)
+                .orElse(false);
+        //stable sort (List.sort/TimSort) so ties keep seat order, not an
+        //arbitrary reordering
+        List<Player> standings = new ArrayList<>(getPlayers());
+        standings.sort(Comparator.comparingInt(Player::getScore).reversed());
+        handler.addObject(new GameOverBanner(winner, humanWon, standings));
     }
 
     public Player determineWinner() {

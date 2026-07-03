@@ -79,7 +79,13 @@ public class Human extends Player{
     @Override
     public void nextTrick() {
         System.out.println("Click anywhere to move on to the next trick.");
-        mouseInput.clearClicks();
-        mouseInput.awaitClick();
+        NextTrickPrompt prompt = new NextTrickPrompt();
+        handler.addObject(prompt);
+        try {
+            mouseInput.clearClicks();
+            mouseInput.awaitClick();
+        } finally {
+            handler.removeObject(prompt);
+        }
     }
 }
