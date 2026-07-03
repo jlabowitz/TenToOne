@@ -30,6 +30,19 @@ public class Round {
         System.out.println("The trump suit is " + trump);
 
         trumpBroken = false;
+
+        //The round's starting player leads its first trick; from here on,
+        //playRound()'s winner.wonTrick() call site moves the flag trick by
+        //trick. currentPlayer/roundStartingPlayer is already the right
+        //value to seed this with, so no separate lookup is needed.
+        initializeTrickLeader();
+    }
+
+    private void initializeTrickLeader() {
+        for (Player player : players) {
+            player.setTrickLeader(false);
+        }
+        getPlayer(currentPlayer).setTrickLeader(true);
     }
 
     public void bet(int currentPlayer) {
@@ -63,10 +76,17 @@ public class Round {
             int actualWinner = convertWinnerIndex(winnerIndex, trickStartPlayer);
 
             Player winner = getPlayer(actualWinner);
+            getPlayer(trickStartPlayer).setTrickLeader(false);
+            winner.setTrickLeader(true);
             winner.wonTrick();
             System.out.println(winner.getName() + " won the trick.");
 
             handler.removeAll(cardsPlayed);
+            //led-suit HUD must already read "no suit led" in the gap between
+            //this trick resolving and the next one starting
+            for (Player player : players) {
+                player.setLeadingSuit(null);
+            }
 
             //winner of trick starts next round;
             currentPlayer = actualWinner;

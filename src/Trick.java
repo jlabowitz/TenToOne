@@ -24,6 +24,7 @@ public class Trick {
     public List<Card> play() {
         List<Card> cardsPlayed = new ArrayList<>();
         Suit leading = null;
+        Card runningHighCard = null;
         for (int i = 0; i < numPlayers(); i++) {
             //play a card
 
@@ -32,7 +33,12 @@ public class Trick {
 
             if (player.getID() == ID.AI) {
                 card.setX(player.getX());
-                card.setY(player.getY() + 20);
+                // +30, not +20: leaves enough clearance below the AI's name
+                // text for the high-card ring (drawn up to 14px above the
+                // card) to not visually collide with it. Player.render's
+                // trickScore/score lines were pushed down (+165/+185) to
+                // give the ring room below the card too.
+                card.setY(player.getY() + 30);
             } else {
                 card.setX((WIDTH - 100) / 2);
                 card.setY(HEIGHT - 300);
@@ -45,7 +51,25 @@ public class Trick {
             cardsPlayed.add(card);
             if (i == 0) {
                 leading = cardsPlayed.get(0).getSuit();
+                for (Player p : players) {
+                    p.setLeadingSuit(leading);
+                }
             }
+
+            //recompute the running high card over cards played so far -- not
+            //new game logic, just an earlier/more frequent call site for
+            //Round.determineTrickWinner/isHigher, which already implements
+            //this comparison for the trick's final card list
+            int highIndex = Round.determineTrickWinner(cardsPlayed, trump);
+            Card newHighCard = cardsPlayed.get(highIndex);
+            if (newHighCard != runningHighCard) {
+                if (runningHighCard != null) {
+                    runningHighCard.setHighCard(false);
+                }
+                newHighCard.setHighCard(true);
+                runningHighCard = newHighCard;
+            }
+
             currentPlayer = nextPlayer(currentPlayer);
         }
         getPlayer(0).nextTrick();

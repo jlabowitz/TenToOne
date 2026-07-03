@@ -12,15 +12,30 @@ public class Card extends GameObject {
     public static final int HEIGHT = 100;
     /** Padding on each side of a card for the trump highlight border. */
     private static final int BORDER = 10;
+    /** Innermost offset of the concentric high-card rings (13/14). */
+    private static final int HIGH_CARD_BORDER = 13;
+    private static final int HIGH_CARD_RING_COUNT = 2;
+    private static final Color HIGH_CARD_COLOR = new Color(204, 153, 0);
 
     private final Suit suit;
     private final CardValue value;
     private boolean trump;
+    /**
+     * Whether this card is the current highest-valued card in the
+     * trick-in-progress. Written by Trick.play() (game-logic thread) after
+     * each card lands, mid-trick, while the render thread concurrently reads
+     * it every frame -- unlike `trump` (written once at deal time, before
+     * any render thread contention), this needs volatile. See Game.running/
+     * Handler's class doc for this codebase's established cross-thread field
+     * pattern.
+     */
+    private volatile boolean highCard;
 
     public Card(Suit suit, CardValue value) {
         this.suit = suit;
         this.value = value;
         this.trump = false;
+        this.highCard = false;
     }
 
     public Suit getSuit() {
@@ -33,6 +48,14 @@ public class Card extends GameObject {
 
     public void setTrump() {
         trump = true;
+    }
+
+    public boolean isHighCard() {
+        return highCard;
+    }
+
+    public void setHighCard(boolean highCard) {
+        this.highCard = highCard;
     }
 
     @Override
@@ -104,6 +127,13 @@ public class Card extends GameObject {
         g.setColor(Color.black);
         if (trump) {
             g.drawRect(x - BORDER, y - BORDER, WIDTH + 2 * BORDER, HEIGHT + 2 * BORDER);
+        }
+        if (highCard) {
+            g.setColor(HIGH_CARD_COLOR);
+            for (int i = 0; i < HIGH_CARD_RING_COUNT; i++) {
+                int offset = HIGH_CARD_BORDER + i;
+                g.drawRect(x - offset, y - offset, WIDTH + 2 * offset, HEIGHT + 2 * offset);
+            }
         }
     }
 }

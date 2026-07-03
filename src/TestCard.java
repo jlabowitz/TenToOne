@@ -2,6 +2,7 @@ import org.junit.Test;
 
 import java.awt.image.BufferedImage;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -32,5 +33,20 @@ public class TestCard {
         BufferedImage first = Card.loadImage(VALID_PATH);
         BufferedImage second = Card.loadImage(VALID_PATH);
         assertSame(first, second);
+    }
+
+    @Test
+    public void freshCardIsNotHighCard() {
+        Card card = new Card(Suit.CLUBS, CardValue.FIVE);
+        assertFalse(card.isHighCard());
+    }
+
+    @Test
+    public void setHighCardTogglesFlag() {
+        Card card = new Card(Suit.CLUBS, CardValue.FIVE);
+        card.setHighCard(true);
+        assertTrue(card.isHighCard());
+        card.setHighCard(false);
+        assertFalse(card.isHighCard());
     }
 }
