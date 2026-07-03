@@ -155,6 +155,42 @@ removing them wasn't attempted opportunistically. They now duplicate what's
 on screen; flagged as a likely target once the "eliminate the terminal"
 goal is revisited, not fixed here.
 
+### 2. Invalid-move on-screen feedback — done, not yet pushed, **not yet visually confirmed**
+A branch-aware fading red→white text message (not a border flash or shake —
+both considered and rejected: a border risked the same pixel-collision class
+of bug the trick-indicators item hit, since `Hand.layoutCards()` spaces
+cards only 24px apart at a 10-card hand; a shake would need `Hand`'s shared
+per-frame layout recompute to add rather than overwrite an offset, touching
+logic every card depends on for a cosmetic effect). `game-designer`'s spec
+found the ticket's framing was incomplete: `Player.legalCards()` has two
+independent illegal-move reasons (leading trump before it's broken, vs. not
+following suit), not one, so a single generic message would have actively
+misled in the trump-lead case.
+
+New `IllegalPlayFeedback` (a `GameObject`, added/removed around
+`Human.playCard()`'s click loop exactly like `BetStepper`/`NextTrickPrompt`'s
+lifecycle) shows the branch-appropriate message in the same verified-clear
+text band `NextTrickPrompt` already established, solid red for ~0.5s then
+linearly interpolating to white over ~1.5s (RGB interpolation, not real
+alpha blending — deliberately avoids `AlphaComposite`, new territory this
+project's raw `Canvas`/`BufferStrategy` pipeline hasn't touched). New
+`Human.illegalReason()` picks the message; `colorAt()` is a pulled-out pure
+function for the fade math, both covered by new unit tests
+(`TestIllegalPlayFeedback`, `TestHumanIllegalReason`) — 73/73 tests passing
+on a clean rebuild.
+
+**Caveat, flagged explicitly rather than silently claimed as done:** this
+shipped without the live "launch and look" visual check this project
+normally relies on as its primary QA signal (per the reduced-flow default) —
+the machine's screen was locked when the implementer attempted it via a
+`Robot`-driven harness, and still locked on a follow-up attempt. Confidence
+here rests on thorough unit coverage of both pure-logic seams (message
+selection, fade timing) plus a direct read of the diff confirming it matches
+the design spec's illustrative code almost verbatim — not on having actually
+seen the message render. **Next session should do a 10-second sanity check**
+(deliberately click an off-suit card and an early trump lead, confirm both
+messages appear and fade correctly) before this is fully trusted.
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.

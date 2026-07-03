@@ -60,20 +60,45 @@ public class Human extends Player{
 
         List<Card> legal = legalCards(cardsPlayed, leading, trump, trumpBroken);
         mouseInput.clearClicks();
-        while (true) {
-            Point click = mouseInput.awaitClick();
-            Card card = getHand().cardAt(click.x, click.y);
-            if (card == null) {
-                continue;
+        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
+        handler.addObject(feedback);
+        try {
+            while (true) {
+                Point click = mouseInput.awaitClick();
+                Card card = getHand().cardAt(click.x, click.y);
+                if (card == null) {
+                    continue;
+                }
+                if (!legal.contains(card)) {
+                    feedback.trigger(illegalReason(cardsPlayed, leading));
+                    System.out.println("The " + card + " is not a legal play.");
+                    continue;
+                }
+                getHand().playCard(card);
+                System.out.println(getName() + " played the " + card);
+                return card;
             }
-            if (!legal.contains(card)) {
-                System.out.println("The " + card + " is not a legal play.");
-                continue;
-            }
-            getHand().playCard(card);
-            System.out.println(getName() + " played the " + card);
-            return card;
+        } finally {
+            handler.removeObject(feedback);
         }
+    }
+
+    /**
+     * Player.legalCards() has two independent branches (leading vs.
+     * following a trick), so an illegal click has two distinct reasons, not
+     * one -- a single generic message (or one that always says "follow
+     * suit") would actively mislead in the trump-lead case. Derived
+     * statically from cardsPlayed.isEmpty(), the same condition
+     * legalCards() itself branches on -- no new state needed.
+     */
+    static String illegalReason(List<Card> cardsPlayed, Suit leading) {
+        if (cardsPlayed.isEmpty()) {
+            return "Trump hasn't been broken yet -- lead a different suit.";
+        }
+        if (leading != null) {
+            return "You must follow suit -- play a " + leading.getDisplayName() + " card.";
+        }
+        return "That card can't be played right now.";
     }
 
     @Override
