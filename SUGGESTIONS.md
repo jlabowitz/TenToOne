@@ -1,8 +1,7 @@
-1. I want a full multiplayer experience. Final version should be a web app of sorts with Google sign in and single player and multiplayer modes. I want to play a game virtually with my friends.
-1. I want the game to be accessible. I think that after entering my name I should be able to hit enter to start or tab to the button for start game. 
-2. I think there should be a dev mode accessible for now, that way I can open it and select which round to start on for example. Probably other settings in the future.
-3. For achievements, I think that they should have a notification in game when they happen. Maybe something that pops up in the top right that can be dismissed? 
-4. I think the between rounds menu can also show you how many of your bonuses you've gotten throughout the game for getting your bet. I think it would be to the left of the column that has the scores.
-5. There's a rule that I missed when I coded this game the first time: the total number of bets in the round cannot equal the number of cards. This way one person has to lose their bet. For example, if this is the round of 8, if the first 4 players bet, 2, 1, 2, 2, then I cannot bet 1. If I wanted to bet 1, then likely I will decide from betting either 0 or 1. This can be an option in a settings menu of custom rules. I would like it to be on by default. I suppose this may impact the existing AIs, I know that I don't really want to modify them, but this probably needs to affect them. I'll let you figure out the details but I assume we need a isLegalBet type function and then the strategy has to be changed. Maybe for the existing AI we can round differently? I think I wrote it so they become integers, but that could solve most cases. And then if it's exactly 1 in my example, then I guess we need to make a choice to round up or down. For the later AIs we could be smart about it because if you want to bet 1, but then you have the Ace of Trump, you can't bet 0 logically because you know you're going to win, even if all your other cards technically suck, you have a better chance of winning with them then losing when you are guaranteed to win.
-6. I don't like "Round Delta" -  maybe some other phrasing "round score"? Not sure. I also think your score should be bolded or something to stand out. And there should be a rank column to the left. Eventually maybe some stylized images of 1, 2, 3, etc. or maybe a gold, silver bronze, medal. Maybe that last part is only on the game winner screen.
-7. A profiles option, so I can have multiple profiles on the same device. Each profile should have its own achievements, etc.
+# Ten to One — Suggestions Intake
+
+Scratch space for ideas as the user thinks of them. Triaged periodically into
+`ROADMAP.md` (or dropped, with a reason) — see that file's `## Notes` section
+for triage history. This file should read as empty or near-empty most of the
+time; a growing backlog here means a triage pass is overdue.
+</content>

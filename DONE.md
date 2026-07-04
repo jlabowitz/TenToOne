@@ -307,6 +307,51 @@ per this project's reduced-flow default, live-verified via `Robot`
 screenshots instead: no collisions in either screen, opens/returns
 correctly, bet-stepper value and full hand preserved on return.
 
+### 13. Achievement system (persistent local storage) — done, pushed
+Local persistent-storage-backed achievement system: a `java.util.Properties`
+file at `<user.home>/.tentoone/save.properties` (not repo-relative, so it
+survives regardless of launch directory), written atomically (temp file +
+`ATOMIC_MOVE`) since this project's dev workflow routinely force-kills the
+running process, with a `saveFormatVersion` migration escape hatch. Read once
+at startup; written after game-end, round-end, and name-submission rather
+than deferred to process exit (no clean-shutdown hook exists). Forward-
+compatible with future multi-profile support (see `ROADMAP.md`'s new item
+for that): `SaveStore.resolveSaveFile(String profileName)` is already
+parameterized, defaulting to one implicit profile today.
+
+**10 non-hidden milestone achievements plus one hidden easter egg** (11
+total, `Achievement.java`): `FIRST_VICTORY`, `TEN_GAMES_PLAYED`,
+`WIN_STREAK_3`/`_5`/`_10`, `SCORE_OVER_50`/`_100` (a third `SCORE_OVER_150`
+tier was scoped and dropped — max theoretical score is 155, requiring
+winning literally every trick, practically unreachable), `PERFECT_ROUND` and
+its harder counterpart `FLAWLESS_GAME` (hit the bet-bonus every round), and
+`COMEBACK_KID` (sole last place at the round-5 halfway point, then win).
+Hidden `BAPI_EASTER_EGG` ("One and Only") unlocks on entering the exact
+(case-insensitive) player name "Bapi" — a pet name for the user's partner —
+checked at name-submission time in `Game.runStartScreen()`.
+
+**Stats screen:** a small always-visible stat line on the Start Screen (best
+score/streak/games played) plus an "Achievements" button opening a full list
+via `AchievementsView` (locked/unlocked; hidden achievements omitted until
+unlocked), reusing `RulesView.showBlocking`'s modal pattern. Mid-session
+unlocks show as a toast (`AchievementToast`) reusing `IllegalPlayFeedback`'s
+hold/fade pattern, queued (not overwrite-in-place) since two achievements can
+unlock in the same instant. **Superseded already**: the user played this
+toast and decided the whole presentation was the wrong shape, not just
+under-tuned — see `ROADMAP.md`'s "Achievement toast redesign" item for the
+box-notification replacement spec.
+
+Design was scoped end-to-end with `game-designer` and the user across two
+spec passes before implementation (see git history on `ROADMAP.md` for the
+two-pass design writeup). `senior-code-reviewer` caught and the implementer
+fixed a real toast-visibility bug, a non-thread-safe queue, and missing
+boundary-condition tests before this shipped. Commit `2919d38`.
+
+Note: `ROADMAP.md`'s original entry for this item also flagged sharing its
+persistence layer with the (still-open) Replay/score history item — that
+item now points back here (`SaveStore`/`SaveData`) rather than describing a
+persistence layer that doesn't exist yet.
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.

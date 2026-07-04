@@ -30,21 +30,25 @@ that item — this is "skip by default," not "never run."
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 1 | AI & polish | ready — **user wants to scope this directly with `game-designer` before any implementation starts** | M, open-ended | `game-designer` → `senior-backend-developer` |
-| 2 | Achievement system (persistent local storage) | ready — **higher priority**, design finalized 2026-07-04 | M | `game-designer` → `senior-developer` |
-| 3 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
-| 4 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
-| 5 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
-| 6 | In-game legend for trick-state indicator symbols | ready | S | `game-designer` → `senior-frontend-developer` |
-| 7 | Trump-card/hand `Handler` leak | deferred | S | `senior-backend-developer` |
-| 8 | Legal-card min/max hand indicators | ready | S | `game-designer` → `senior-frontend-developer` |
-| 9 | In-play round/card-count HUD + hamburger menu | ready | M | `game-designer` → `senior-frontend-developer` + `senior-backend-developer` |
-| 10 | Replay/score history (persistent storage) | ready | S-M | `senior-backend-developer` + `senior-frontend-developer` |
-| 11 | Difficulty tiers: freeplay vs. journey mode | blocked — depends on item 1 | M-L, open-ended | agent TBD |
-| 12 | Distributable executable + GitHub Release | deferred | S-M | `senior-backend-developer` |
-| 13 | Bapi visual/wording flourish | deferred | S | agent TBD |
-| 14 | "OP"/"Cheater" guaranteed-best-cards easter egg | deferred | unclear | agent TBD |
-| 15 | Achievement toast redesign (box notification, non-fading, click-to-highlight) | deferred | S-M | `game-designer` → `senior-developer` |
+| 1 | AI & polish | ready — **user wants to scope this directly with `game-designer` before any implementation starts** | M, open-ended | `game-designer` → `senior-developer` |
+| 2 | Achievement toast redesign (box notification, non-fading, click-to-highlight) | ready | S-M | `game-designer` → `senior-developer` |
+| 3 | Dev mode: jump-to-round + extensible dev settings | ready | S-M | `game-designer` → `senior-developer` |
+| 4 | Accessibility: Enter-to-submit name, Tab-focus to Start Game | ready | S | `senior-developer` |
+| 5 | In-game legend for trick-state indicator symbols | ready | S | `game-designer` → `senior-developer` |
+| 6 | Legal-card min/max hand indicators | ready | S | `game-designer` → `senior-developer` |
+| 7 | Round summary panel enhancements (bonus-count column, rank column, phrasing/bold) | ready | S-M | `game-designer` → `senior-developer` |
+| 8 | In-play round/card-count HUD + hamburger menu | ready | M | `game-designer` → `senior-developer` |
+| 9 | Replay/score history (persistent storage) | ready | S-M | `senior-developer` |
+| 10 | Difficulty tiers: freeplay vs. journey mode | blocked — depends on item 1 | M-L, open-ended | agent TBD |
+| 11 | Trump-card/hand `Handler` leak | deferred | S | `senior-developer` |
+| 12 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-developer` |
+| 13 | Distributable executable + GitHub Release | deferred | S-M | `senior-developer` |
+| 14 | Multi-profile support | deferred | unclear, likely M | agent TBD |
+| 15 | Bapi visual/wording flourish | deferred | S | agent TBD |
+| 16 | "OP"/"Cheater" guaranteed-best-cards easter egg | deferred | unclear | agent TBD |
+| 17 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
+| 18 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+| 19 | Full multiplayer web app (accounts, single/multiplayer) | deferred — needs its own dedicated scoping conversation before any work starts | XL, open-ended | agent TBD |
 
 All live visual sanity checks previously owed here (invalid-move feedback,
 start screen/rules/name entry) were walked by the user once back at their
@@ -85,7 +89,7 @@ cleanup, which nothing below is currently tracking as its own item.
 
 ## Queue
 
-### 1. AI & polish — `ready` — M, open-ended — `game-designer` → `senior-backend-developer`
+### 1. AI & polish — `ready` — M, open-ended — `game-designer` → `senior-developer`
 **User wants to scope this directly with `game-designer` before any
 implementation starts** — hold here rather than delegating ahead on it.
 User has specific ideas/direction to bring to that conversation and has
@@ -118,73 +122,202 @@ conversation rather than treating them as separate items:
 - User also floated eventually making this ML-driven ("find the optimal
   strategy") as a stretch idea — raise it in the same conversation, not
   scoped further here.
-- Item 11 below (difficulty tiers / journey mode) depends on whatever
+- **Betting-legality rule (added 2026-07-04, from `SUGGESTIONS.md`):** a
+  genuine rule gap, not covered by the original design — the total of all
+  bets placed in a round can currently equal the round's card count, but
+  real trick-taking-game rules require at least one player to miss their
+  bet, so the sum must never exactly equal the card count. Needs to become
+  a togglable setting (default **on**), implying a settings-menu surface
+  that doesn't exist yet. Affects every bettor, human and AI: needs an
+  `isLegalBet`-shaped check, and every existing AI's bet-rounding logic
+  likely needs adjustment to avoid landing on now-illegal totals (user
+  suggested rounding differently, and manually deciding a round-up/
+  round-down tie-break when the boundary bet is the AI's only sensible
+  choice) — the user is fine with this specific rounding-behavior change
+  touching `AI_Easy`/`AI_Zombie`, distinct from the standing "don't modify
+  existing AI" rule, which is about *strategy*, not compliance with a
+  corrected core rule. A smarter AI could reason about legality using real
+  hand knowledge (e.g. holding the trump Ace makes betting 0 illogical even
+  with a weak rest-of-hand) — raise that alongside the other AI-strategy
+  ideas above in the same conversation.
+- Item 10 below (difficulty tiers / journey mode) depends on whatever
   AI-tier structure comes out of this conversation — see that item.
 
-### 2. Achievement system (persistent local storage) — `ready` — **higher priority** — M — `game-designer` → `senior-developer`
-Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #2, explicitly
-flagged by the user as "(Higher priority)"). Local persistent-storage-backed
-achievement system: a high-score indicator, a win-streak counter, and
-milestone achievements. **Design finalized 2026-07-04** after two
-`game-designer` spec passes plus user review — ready to implement directly,
-no further design round-trip needed.
+### 2. Achievement toast redesign (box notification, non-fading, click-to-highlight) — `ready` — S-M — `game-designer` → `senior-developer`
+Added 2026-07-04, after the user played the achievement toast shipped in
+`DONE.md` item 13 and its three follow-up fixes (longer hold,
+click-to-dismiss, in-game Achievements button) and decided the whole
+presentation is the wrong shape, not just under-tuned. **This replaces the
+current centered-fading-banner toast entirely** — not another tuning pass.
+Concrete replacement spec, from the user's own sketch:
+- A bordered box in the **top-left corner** (not centered/top-banner).
+- **No fade-out at any point** — stays fully solid/visible until the user
+  dismisses it (the just-shipped auto-fade and click-to-dismiss behavior
+  from `DONE.md` item 13 is superseded here).
+- **Continuously animates in a loop** (gold color, pulsing/looping) the
+  entire time it's displayed, rather than a static hold.
+- **Clicking it opens `AchievementsView` directly**, with the just-unlocked
+  achievement visually highlighted in an intuitive way (exact highlight
+  treatment — border, background tint, etc. — left to whoever designs
+  this).
+- Needs a dismiss path for a user who doesn't want to open Achievements
+  (a close control, or a distinct "click elsewhere on the box" affordance)
+  — worth a `game-designer` pass to nail exact interaction details (e.g.
+  dismiss-without-opening vs. click-always-opens-Achievements, the specific
+  loop animation) rather than assuming.
 
-**Storage:** a `java.util.Properties` file at
-`<user.home>/.tentoone/save.properties` — deliberately not repo-relative, so
-it survives regardless of launch directory (including a future `jpackage`
-distributable, item 12). Written atomically (temp file + `ATOMIC_MOVE`)
-since this project's dev workflow routinely force-kills the running
-process; includes a `saveFormatVersion` key as a migration escape hatch.
-Read once at startup; written after game-end, round-end (for round-level
-score/bonus checks), and name-submission (for the Bapi check) rather than
-deferred to process exit, since there's no clean-shutdown hook today.
-Shares its `.tentoone` directory with item 10 (Replay/score history) via a
-small reusable "resolve app-data dir" utility, without designing item 10's
-own file format here.
+The underlying FIFO-queue/`Handler.keepOnTop()` mid-game-visibility plumbing
+built for the current toast (`DONE.md` item 13) is likely still reusable —
+this is a presentation-layer redesign, not a new architecture.
 
-**Forward-compatible with future multi-profile support:** the user has
-floated (and added to `SUGGESTIONS.md`) wanting multiple named profiles
-later, each with their own achievements. Not in scope now, but the
-save-path resolution should be a parameterized function (e.g.
-`resolveSaveFile(profileName)`, defaulting to one implicit profile) so that
-adding real profile support later means pointing that function at a
-different file per profile, not migrating the save format or rewriting the
-storage layer.
+**Promoted from `deferred` to `ready`** during 2026-07-04's roadmap
+reprioritization pass — this was already fully spec'd with nothing blocking
+it, and it directly addresses the user's own stated dissatisfaction with
+what just shipped, so leaving it deferred served no purpose.
 
-**Milestone achievements (10 total, non-hidden — plus the hidden Bapi
-achievement below, 11 including it):** `FIRST_VICTORY` (win your
-first game), `TEN_GAMES_PLAYED` (play 10 games total), `WIN_STREAK_3`/`_5`/
-`_10` (win-streak tiers), `SCORE_OVER_50`/`_100` (single-game score
-thresholds — a third `SCORE_OVER_150` tier was scoped and then dropped by
-the user: max theoretical score is 155, requiring winning literally every
-trick in the game, which is practically unreachable without exceptional
-hand RNG), `PERFECT_ROUND` (hit the bet bonus once) and its harder
-counterpart `FLAWLESS_GAME` (hit it in all 10 rounds), and `COMEBACK_KID`
-(sole last place at the round-5 halfway point, then win the game).
+### 3. Dev mode: jump-to-round + extensible dev settings — `ready` — S-M — `game-designer` → `senior-developer`
+Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`). A developer-only
+mode, accessible for now (not necessarily gated later), that lets the user
+jump straight to a specific round instead of playing through from round 1 —
+mainly to speed up manual testing/playtesting of later-round behavior
+(outcome banner, high round numbers, endgame achievements, etc.), which
+today requires playing a full 10-round game every time. User expects more
+settings to accumulate here over time, so the entry point/UI should be built
+as an extensible small settings surface, not a single-purpose round-jump
+hack.
 
-**Bapi easter egg (in scope, fully specified):** entering the player name
-"Bapi" (case-insensitive, exact match only — not a substring match) unlocks
-a hidden achievement, `BAPI_EASTER_EGG` ("One and Only"). This is a pet name
-for the user's partner. Checked at name-submission time
-(`Game.runStartScreen()`'s `case START:` branch), same permanent-unlock
-semantics as every other achievement. **Explicitly deferred, not this
-pass:** any visual/wording flourish tied to that name (background tint,
-special phrasing) — see new item 13 below.
+Design questions for the `game-designer` pass: how it's triggered (a hidden
+hotkey, a command-line flag/system property, a debug menu reachable from the
+Start Screen), whether jumping to round N needs to fabricate plausible
+bet/score state for the skipped rounds or can start clean at round N with
+zero prior history, and how future dev settings get added to whatever
+surface this creates without redesigning it each time.
 
-**Stats screen:** yes — a small always-visible stat line on the Start
-Screen (best score/streak/games played) plus a new "Achievements" button
-opening a full list (locked/unlocked; hidden achievements omitted until
-unlocked), reusing the existing `RulesView.showBlocking` modal pattern.
-Mid-session unlocks show as a toast reusing the `IllegalPlayFeedback`
-hold/fade pattern, queued rather than overwrite-in-place (two achievements
-can unlock in the same instant).
+### 4. Accessibility: Enter-to-submit name, Tab-focus to Start Game — `ready` — S — `senior-developer`
+Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`). Two small
+keyboard-accessibility gaps on the Start Screen: hitting Enter after typing
+a name should submit/start the game (same effect as clicking Start Game),
+and Tab should be able to move focus to the Start Game button so a mouse
+isn't required to proceed. This was already flagged as a deferred
+future-pass item when the Start Screen originally shipped (see `DONE.md`
+item 10's "deliberately deferred to a future options-menu pass" note on
+Enter-to-submit) — this is that pass. No design ambiguity here, routed
+straight to `senior-developer` rather than through `game-designer`.
 
-Note: shares a "needs local persistent storage" dependency with item 10
-(Replay/score history) below — the storage mechanism above (format, file
-location, read/write timing) is designed to serve both rather than building
-two separate ad hoc persistence layers.
+### 5. In-game legend for trick-state indicator symbols — `ready` — S — `game-designer` → `senior-developer`
+Flagged as a gap during the trick-state indicators' design spec (2026-07-02,
+shipped — see `DONE.md`): none of the three indicators (trick-leader dot,
+led-suit HUD line, high-card ring) explain themselves to a new player on
+first sight. Was blocked on the rules/instructions view existing as a place
+to put it — unblocked now that `RulesView` has shipped with a reserved,
+measured-but-empty legend slot waiting for exactly this
+(`RulesView.LEGEND_TOP`/`LEGEND_BOTTOM`/`CONTENT_LEFT`/`CONTENT_RIGHT`, see
+`DONE.md`'s start-screen entry) — implementer should draw into that slot,
+not invent new bounds.
 
-### 3. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
+### 6. Legal-card min/max hand indicators — `ready` — S — `game-designer` → `senior-developer`
+Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #1). A red
+circle indicator on/near the lowest-valued legal card and a green circle
+indicator on/near the highest-valued legal card in the human's hand, similar
+in spirit to the existing trick-leader/high-card indicators (see `DONE.md`'s
+trick-state indicators entry) — reuse `Player.legalCards()` to determine
+which cards qualify each trick. Likely benefits from the same
+design-spec-then-implement approach the trick-state indicators used, given
+that item's history of pixel-collision bugs the spec's arithmetic didn't
+catch on the first pass.
+
+### 7. Round summary panel enhancements — `ready` — S-M — `game-designer` → `senior-developer`
+Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`), three related
+tweaks to `RoundSummaryPanel`/`GameOverBanner` (see `DONE.md` item 8 for
+that panel's original design):
+- A new column showing each player's running count of bet-bonus hits so far
+  in the game (how many rounds they've bet exactly right), placed to the
+  left of the existing score column.
+- Rename the "Round Delta" column to clearer phrasing (user suggested
+  "Round Score" as one option, not finalized) and visually emphasize each
+  player's own score (bold or similar) so it stands out from opponents'.
+- Add a rank column to the left of the existing columns; user has floated
+  (as a stretch, not required for this pass) eventually replacing plain
+  rank numbers with stylized 1st/2nd/3rd-place imagery or gold/silver/
+  bronze medals, possibly reserved for the final game-over screen only
+  rather than every round summary.
+
+Given `RoundSummaryPanel`'s history of pixel-collision/layout bugs on prior
+passes (see `DONE.md` items 7, 8, 11), this is worth a real `game-designer`
+spec pass on exact column layout rather than eyeballing it.
+
+### 8. In-play round/card-count HUD + hamburger menu — `ready` — M — `game-designer` → `senior-developer`
+Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #3). Two
+related pieces, both about in-play chrome:
+- A small always-visible status readout during play (not just between
+  rounds) showing the current round number and how many cards are in the
+  round — user suggested a small box in the top-right as one option.
+- A hamburger-menu icon (top-left, per user's suggestion) exposing: Rules
+  (already has a `RulesView` and hotspot pattern to reuse, see `DONE.md`),
+  Restart (must show a confirmation popup requiring a second/explicit click
+  before actually restarting — don't restart on the first click), "back to
+  main menu" (explicitly **not** the same as restart — the user wants the
+  in-progress game state kept in memory so returning to the menu doesn't
+  lose it, i.e. some kind of suspend/resume rather than a hard reset), and
+  Pause.
+
+Design questions to resolve during the `game-designer` pass rather than
+assumed: exact hamburger-menu visual treatment, what "pause" freezes (AI
+turn timers? animations? both?), and the state-retention mechanism for
+"back to main menu without restarting" (this is new territory — nothing
+today suspends a game and returns to the start screen without discarding
+state).
+
+### 9. Replay/score history (persistent storage) — `ready` — S-M — `senior-developer`
+Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #4). A history
+of past game scores the user can look back at, stored in local persistent
+storage. The persistence layer this needs now already exists — see `DONE.md`
+item 13 (Achievement system), which shipped `SaveStore`/`SaveData` backed by
+a `Properties` file at `<user.home>/.tentoone/save.properties` (or a
+profile-scoped variant, see `SaveStore.resolveSaveFile(String)`). Extend
+that store/format rather than building a second, separate persistence
+mechanism.
+
+### 10. Difficulty tiers: freeplay vs. journey mode — `blocked` — M-L, open-ended — agent TBD (downstream of item 1)
+Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #5). Two
+proposed modes: a **freeplay mode** where the user can directly pick an AI
+difficulty to play against, and a **journey mode** where harder tiers unlock
+progressively (e.g. beat `AI_Zombie` 5 times to unlock "easy," beat "easy" 5
+times to unlock "hard," etc.).
+
+**Blocked on item 1**: this only makes sense once there are multiple
+distinct, ordered AI difficulty tiers to select/unlock — today there's just
+`AI_Easy` and unused `AI_Zombie`. Fold this into the same `game-designer`
+conversation scoping item 1's AI strategy work rather than scoping it
+independently; it's a UI/mode-selection layer on top of whatever tier
+structure that conversation produces, not a separable feature.
+
+### 11. Trump-card/hand `Handler` leak — `deferred` — S — `senior-developer`
+Discovered during `senior-code-reviewer`'s pass on the Play-again item (this
+session): `Round.renderTrumpCard()` and `Round.renderPlayerHand()` add a
+trump `Card`/`Hand` object to the `Handler` every round, but nothing anywhere
+ever calls `handler.removeObject()` on either — a pre-existing gap in
+`Round.java`, not introduced by Play-again. Previously bounded: a process
+only ever played one game before Play-again existed, capping accumulation at
+10 trump cards + duplicate same-reference hand entries per process run.
+Play-again's `Player.resetForNewGame()` nulling the human's hand (the
+correct choice, so each new game gets a genuinely fresh deal) removed that
+incidental cap — a long session of repeated "Play Again" clicks now
+accumulates these objects with no upper bound.
+
+Practically negligible, not urgent: no visible symptom (trump cards always
+render at a fixed pixel position, so older leaked ones are simply painted
+over every frame, never seen) and only cheap objects leak (no image data —
+that's a separate process-wide static cache, not per-`Card`). Would take on
+the order of hundreds-to-thousands of restarts in a single sitting to matter
+at all.
+
+Fix, when picked up: track and remove the previous round's trump card in
+`Round.renderTrumpCard()` before adding the new one; stop unconditionally
+re-adding the same `Hand` reference to the `Handler` every round in
+`Round.renderPlayerHand()` (only add once per game, not once per round).
+
+### 12. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
 monitor to a secondary monitor with a different Windows display-scale
 factor causes blurry/stretched rendering. Root cause: the game renders via a
@@ -201,13 +334,61 @@ Swing's more DPI-aware repaint pipeline.
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
-### 4. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
+### 13. Distributable executable + GitHub Release — `deferred` — S-M — `senior-developer`
+Added 2026-07-04 per user request, to make the game shareable with
+non-developer players (no git/JDK required on their end). Proposed approach,
+not yet scoped in detail: use `jpackage` (bundled with JDK 21) to produce a
+self-contained Windows app-image or installer with a private Java runtime
+embedded, then attach it as a binary asset on a tagged GitHub Release. A full
+`.exe`/`.msi` installer needs the WiX Toolset as a build-time dependency; a
+plain app-image skips that but ships as a folder to unzip rather than a
+single installer file — that tradeoff is unresolved. **Deferred**: user
+doesn't need this now.
+
+### 14. Multi-profile support — `deferred` — size unclear, likely M — agent TBD
+Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`): multiple named
+profiles on the same device, each with their own achievements/stats
+(and, per item 9 above, presumably their own replay/score history too).
+Already anticipated, not yet built: `DONE.md` item 13 (Achievement system)
+shipped `SaveStore.resolveSaveFile(String profileName)` specifically so
+this wouldn't require a storage-format migration later — today it's always
+called with one implicit default profile. Whoever picks this up still needs
+to design profile creation/switching UI (presumably on or near the Start
+Screen, where the name is already entered) and decide how it interacts with
+name entry (is the typed name the profile, or a separate concept?) — not
+scoped further here since the user hasn't weighed in on that yet.
+**Deferred**: user doesn't need this now.
+
+### 15. Bapi visual/wording flourish — `deferred` — S — agent TBD
+Spun off from the Bapi easter-egg achievement (`DONE.md` item 13,
+2026-07-04): once the "Bapi" achievement itself is implemented, there's an
+open, explicitly deferred question about whether entering that name should
+also change something visually/textually elsewhere in the game — the user's
+own brainstorm, not yet decided. Two rough options floated during that
+item's design pass: a subtle warm-palette tint (session-only, contained to a
+specific UI element rather than a full reskin) or a single extra personal
+line attached to the achievement's own unlock toast. User explicitly said
+they don't know what they want yet — revisit now that the achievement itself
+has shipped and they've seen it in action.
+
+### 16. "OP"/"Cheater" guaranteed-best-cards easter egg — `deferred` — size unclear — agent TBD
+Raised by the user 2026-07-04 while finalizing the achievement system's
+design: entering a name like "OP," "Super OP," or "Cheater" (exact wording
+undecided — user floated these as brainstorm examples, not final) would put
+the human player in a "god mode" where they're always dealt the best cards
+each round. Distinct from the Bapi achievement (`DONE.md` item 13) — this
+would need real deal-logic changes (guaranteed best cards), not just a
+name-triggered achievement unlock, so it's a heavier lift than a cosmetic
+easter egg. User explicitly said this isn't necessary right now — logged for
+later rather than scoped in detail.
+
+### 17. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
 Added 2026-07-02 per user request: "much later down the line," a full
 visual/art overhaul of the game beyond the functional UI fixes above.
 Intentionally deferred — revisit once the functional/UX backlog (item 1) is
 in a good place; scoping it now would be premature.
 
-### 5. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
+### 18. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
 Added 2026-07-02 per user request, **explicitly planning-only — do not
 implement yet**. The current `src/` layout is flat: all production and test
 `.java` files live directly under `src/` with no subfolders, a structure the
@@ -239,155 +420,18 @@ a concrete list of what changes (build command, test invocation, CLAUDE.md,
 every file's package/import) before touching any files — not attempt the
 migration inline with unrelated work.
 
-### 6. In-game legend for trick-state indicator symbols — `ready` — S — `game-designer` → `senior-frontend-developer`
-Flagged as a gap during the trick-state indicators' design spec (2026-07-02,
-shipped — see `DONE.md`): none of the three indicators (trick-leader dot,
-led-suit HUD line, high-card ring) explain themselves to a new player on
-first sight. Was blocked on the rules/instructions view existing as a place
-to put it — unblocked now that `RulesView` has shipped with a reserved,
-measured-but-empty legend slot waiting for exactly this
-(`RulesView.LEGEND_TOP`/`LEGEND_BOTTOM`/`CONTENT_LEFT`/`CONTENT_RIGHT`, see
-`DONE.md`'s start-screen entry) — implementer should draw into that slot,
-not invent new bounds.
-
-### 7. Trump-card/hand `Handler` leak — `deferred` — S — `senior-backend-developer`
-Discovered during `senior-code-reviewer`'s pass on the Play-again item (this
-session): `Round.renderTrumpCard()` and `Round.renderPlayerHand()` add a
-trump `Card`/`Hand` object to the `Handler` every round, but nothing anywhere
-ever calls `handler.removeObject()` on either — a pre-existing gap in
-`Round.java`, not introduced by Play-again. Previously bounded: a process
-only ever played one game before Play-again existed, capping accumulation at
-10 trump cards + duplicate same-reference hand entries per process run.
-Play-again's `Player.resetForNewGame()` nulling the human's hand (the
-correct choice, so each new game gets a genuinely fresh deal) removed that
-incidental cap — a long session of repeated "Play Again" clicks now
-accumulates these objects with no upper bound.
-
-Practically negligible, not urgent: no visible symptom (trump cards always
-render at a fixed pixel position, so older leaked ones are simply painted
-over every frame, never seen) and only cheap objects leak (no image data —
-that's a separate process-wide static cache, not per-`Card`). Would take on
-the order of hundreds-to-thousands of restarts in a single sitting to matter
-at all.
-
-Fix, when picked up: track and remove the previous round's trump card in
-`Round.renderTrumpCard()` before adding the new one; stop unconditionally
-re-adding the same `Hand` reference to the `Handler` every round in
-`Round.renderPlayerHand()` (only add once per game, not once per round).
-
-### 8. Legal-card min/max hand indicators — `ready` — S — `game-designer` → `senior-frontend-developer`
-Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #1). A red
-circle indicator on/near the lowest-valued legal card and a green circle
-indicator on/near the highest-valued legal card in the human's hand, similar
-in spirit to the existing trick-leader/high-card indicators (see `DONE.md`'s
-trick-state indicators entry) — reuse `Player.legalCards()` to determine
-which cards qualify each trick. Likely benefits from the same
-design-spec-then-implement approach the trick-state indicators used, given
-that item's history of pixel-collision bugs the spec's arithmetic didn't
-catch on the first pass.
-
-### 9. In-play round/card-count HUD + hamburger menu — `ready` — M — `game-designer` → `senior-frontend-developer` + `senior-backend-developer`
-Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #3). Two
-related pieces, both about in-play chrome:
-- A small always-visible status readout during play (not just between
-  rounds) showing the current round number and how many cards are in the
-  round — user suggested a small box in the top-right as one option.
-- A hamburger-menu icon (top-left, per user's suggestion) exposing: Rules
-  (already has a `RulesView` and hotspot pattern to reuse, see `DONE.md`),
-  Restart (must show a confirmation popup requiring a second/explicit click
-  before actually restarting — don't restart on the first click), "back to
-  main menu" (explicitly **not** the same as restart — the user wants the
-  in-progress game state kept in memory so returning to the menu doesn't
-  lose it, i.e. some kind of suspend/resume rather than a hard reset), and
-  Pause.
-
-Design questions to resolve during the `game-designer` pass rather than
-assumed: exact hamburger-menu visual treatment, what "pause" freezes (AI
-turn timers? animations? both?), and the state-retention mechanism for
-"back to main menu without restarting" (this is new territory — nothing
-today suspends a game and returns to the start screen without discarding
-state).
-
-### 10. Replay/score history (persistent storage) — `ready` — S-M — `senior-backend-developer` + `senior-frontend-developer`
-Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #4). A history
-of past game scores the user can look back at, stored in local persistent
-storage (same "no persistence exists yet" gap as item 2 — see that item's
-note about sharing a single storage mechanism rather than building two).
-
-### 11. Difficulty tiers: freeplay vs. journey mode — `blocked` — M-L, open-ended — agent TBD (downstream of item 1)
-Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #5). Two
-proposed modes: a **freeplay mode** where the user can directly pick an AI
-difficulty to play against, and a **journey mode** where harder tiers unlock
-progressively (e.g. beat `AI_Zombie` 5 times to unlock "easy," beat "easy" 5
-times to unlock "hard," etc.).
-
-**Blocked on item 1**: this only makes sense once there are multiple
-distinct, ordered AI difficulty tiers to select/unlock — today there's just
-`AI_Easy` and unused `AI_Zombie`. Fold this into the same `game-designer`
-conversation scoping item 1's AI strategy work rather than scoping it
-independently; it's a UI/mode-selection layer on top of whatever tier
-structure that conversation produces, not a separable feature.
-
-### 12. Distributable executable + GitHub Release — `deferred` — S-M — `senior-backend-developer`
-Added 2026-07-04 per user request, to make the game shareable with
-non-developer players (no git/JDK required on their end). Proposed approach,
-not yet scoped in detail: use `jpackage` (bundled with JDK 21) to produce a
-self-contained Windows app-image or installer with a private Java runtime
-embedded, then attach it as a binary asset on a tagged GitHub Release. A full
-`.exe`/`.msi` installer needs the WiX Toolset as a build-time dependency; a
-plain app-image skips that but ships as a folder to unzip rather than a
-single installer file — that tradeoff is unresolved. **Deferred**: user
-doesn't need this now.
-
-### 13. Bapi visual/wording flourish — `deferred` — S — agent TBD
-Spun off from item 2's Bapi easter-egg achievement (2026-07-04): once the
-"Bapi" achievement itself is implemented, there's an open, explicitly
-deferred question about whether entering that name should also change
-something visually/textually elsewhere in the game — the user's own
-brainstorm, not yet decided. Two rough options floated during item 2's
-design pass: a subtle warm-palette tint (session-only, contained to a
-specific UI element rather than a full reskin) or a single extra personal
-line attached to the achievement's own unlock toast. User explicitly said
-they don't know what they want yet — revisit once item 2 ships and they've
-seen the achievement itself in action.
-
-### 14. "OP"/"Cheater" guaranteed-best-cards easter egg — `deferred` — size unclear — agent TBD
-Raised by the user 2026-07-04 while finalizing item 2's design: entering a
-name like "OP," "Super OP," or "Cheater" (exact wording undecided — user
-floated these as brainstorm examples, not final) would put the human player
-in a "god mode" where they're always dealt the best cards each round.
-Distinct from the Bapi achievement (item 2) — this would need real
-deal-logic changes (guaranteed best cards), not just a name-triggered
-achievement unlock, so it's a heavier lift than a cosmetic easter egg. User
-explicitly said this isn't necessary right now — logged for later rather
-than scoped in detail.
-
-### 15. Achievement toast redesign (box notification, non-fading, click-to-highlight) — `deferred` — S-M — `game-designer` → `senior-developer`
-Added 2026-07-04, after the user played the just-shipped mid-session
-achievement toast (item 2) and its three follow-up fixes (longer hold,
-click-to-dismiss, in-game Achievements button) and decided the whole
-presentation is the wrong shape, not just under-tuned. **This replaces the
-current centered-fading-banner toast entirely** — not another tuning pass.
-Concrete replacement spec, from the user's own sketch:
-- A bordered box in the **top-left corner** (not centered/top-banner).
-- **No fade-out at any point** — stays fully solid/visible until the user
-  dismisses it (the just-shipped auto-fade and click-to-dismiss behavior
-  from this session's follow-up work is superseded here).
-- **Continuously animates in a loop** (gold color, pulsing/looping) the
-  entire time it's displayed, rather than a static hold.
-- **Clicking it opens `AchievementsView` directly**, with the just-unlocked
-  achievement visually highlighted in an intuitive way (exact highlight
-  treatment — border, background tint, etc. — left to whoever designs
-  this).
-- Needs a dismiss path for a user who doesn't want to open Achievements
-  (a close control, or a distinct "click elsewhere on the box" affordance)
-  — worth a `game-designer` pass to nail exact interaction details (e.g.
-  dismiss-without-opening vs. click-always-opens-Achievements, the specific
-  loop animation) rather than assuming.
-
-The underlying FIFO-queue/`Handler.keepOnTop()` mid-game-visibility plumbing
-built for the current toast (item 2 and its follow-ups) is likely still
-reusable — this is a presentation-layer redesign, not a new architecture.
+### 19. Full multiplayer web app (accounts, single/multiplayer) — `deferred` — XL, open-ended, needs its own scoping conversation — agent TBD
+Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`): a "final version"
+idea of a full web-app rewrite/expansion with Google sign-in, single-player
+and multiplayer modes, playable with friends over the network. This is a
+genuine architecture pivot away from the current desktop Swing/no-backend
+shape (`CLAUDE.md` frames this project as a personal, not-currently-shipping
+desktop app) — a web stack, user accounts, and real-time multiplayer netcode
+aren't an incremental feature on top of what exists today, they're close to
+a parallel project. **Explicitly deferred, not scoped further here** — same
+treatment as item 1 (AI & polish) and item 18 (`src/` restructuring): needs
+its own dedicated conversation with the user before any implementation
+starts, not something to plan or estimate speculatively in this queue entry.
 
 ---
 
@@ -482,6 +526,57 @@ reusable — this is a presentation-layer redesign, not a new architecture.
   primary-owner column was also corrected from a frontend/backend split to
   `senior-developer`, matching this project's stated generalist-role
   preference in `CLAUDE.md` (this repo has no real frontend/backend seam).
+- 2026-07-04 (later same day): a full triage/reprioritization pass. Item 2
+  (Achievement system) shipped, was confirmed pushed (`commit 2919d38`), and
+  moved to `DONE.md` as that file's item 13 — this file's queue renumbered
+  accordingly. `SUGGESTIONS.md` was triaged in full: 4 new items added
+  (dev mode / jump-to-round, Start Screen keyboard accessibility, round
+  summary panel enhancements bundling three related suggestions, and
+  multi-profile support), one suggestion (a betting-legality rule requiring
+  a round's total bets never equal its card count) was folded into item 1's
+  existing scoping-material list rather than made a standalone item, since
+  it's gated behind the same held `game-designer` conversation and touches
+  the same AI-betting surface; one suggestion (an achievement-unlock
+  notification popup) was dropped as a less-detailed duplicate of the
+  already-tracked, more-recent achievement-toast-redesign item; and one
+  suggestion (a full web-app multiplayer rewrite with Google sign-in) was
+  deliberately *not* triaged in either direction — it's a full architecture
+  pivot away from this project's current desktop-Swing/no-backend shape, a
+  genuine product fork rather than an incremental item, so it was flagged
+  back to the user for an explicit decision instead of being guessed at; it
+  remains in `SUGGESTIONS.md` pending that answer. Rather than simply
+  appending the 4 new items at the end of the queue, the whole active
+  backlog was reordered by value/leverage: the achievement-toast redesign
+  (fully spec'd already, and directly responsive to the user's own
+  dissatisfaction with the just-shipped toast) was promoted from `deferred`
+  to `ready` and moved near the top; the new dev-mode item was placed early
+  for its testing-velocity leverage on every future item; low-value/large-
+  scope/deferred items (visual overhaul, `src/` restructuring, DPI rescale,
+  distributable executable, the two easter-egg items, Bapi flourish, new
+  multi-profile item) were grouped toward the bottom. Old item numbers from
+  before this pass are not preserved here given how many items moved and how
+  many were inserted mid-queue rather than appended — consult git history if
+  the prior numbering is needed. Separately, every item's primary-owner
+  column was normalized from a `senior-frontend-developer`/
+  `senior-backend-developer` split to plain `senior-developer` throughout
+  (not just item 2, which got this fix in isolation on 2026-07-04 earlier
+  the same day) — this project has no real frontend/backend seam per
+  `CLAUDE.md`, and leaving some items on the old split read as an
+  inconsistency once one item had already been corrected. Item 9 (Replay/
+  score history)'s writeup was also corrected: it previously described "no
+  persistence exists yet" as a shared gap with item 2 — since item 2 shipped
+  first, item 9 now correctly points at the persistence layer (`SaveStore`/
+  `SaveData`) that already exists rather than describing it as future work.
+- 2026-07-04 (later still, same day): the one item left unresolved from the
+  triage pass above — a full multiplayer web-app rewrite (Google sign-in,
+  single/multiplayer) — was resolved by the user: log it as a deferred
+  "someday" item needing its own scoping conversation, same treatment as
+  items 1 and 18, rather than estimating or planning it here. Added as new
+  item 19, appended at the end without renumbering the rest of the queue
+  (consistent with how items 13/14 were appended earlier the same day) since
+  it carries no priority signal and sits alongside the other deferred/
+  large-scope items already at the bottom. Removed from `SUGGESTIONS.md`,
+  which returns to empty.
 
 ## Process notes
 
@@ -508,3 +603,4 @@ conversation were consistently visible to and interactive with the user
 throughout the rest of the session. Before assuming screenshots can't work,
 try capturing all screens (iterate
 `GraphicsEnvironment.getScreenDevices()`), not just the default one.
+</content>
