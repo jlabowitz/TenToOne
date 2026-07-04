@@ -1,5 +1,9 @@
 import org.junit.Test;
 
+import java.awt.Canvas;
+import java.awt.Component;
+import java.awt.event.MouseEvent;
+
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -54,5 +58,56 @@ public class TestRulesView {
         RulesView view = new RulesView();
         assertFalse(view.isBackButton(0, 0));
         assertFalse(view.isBackButton(400, 300));
+    }
+
+    /**
+     * Code-review Finding 1 (achievement-toast click-to-dismiss): showBlocking's
+     * click loop must dismiss a showing AchievementToast before it ever reaches
+     * the Back-button check, mirroring the exact wiring Human's three loops
+     * already had. AchievementToast.isToastHotspot()/dismiss()'s own semantics
+     * are already exhaustively covered by TestAchievementToast -- this only
+     * smoke-tests that showBlocking's loop actually wires them in. Feeds a
+     * click inside the toast's dismiss band first, then the real Back-button
+     * click, from a background thread (same sleep-then-act idiom TestGame's
+     * stopFromExternalThreadDoesNotHangAndFlipsRunningFalse already uses for a
+     * comparable cross-thread readiness assumption): if the dismiss click had
+     * fallen through to isBackButton() unhandled, this would hang (Back is
+     * never actually clicked again) and fail via the JUnit timeout rather than
+     * silently passing.
+     */
+    @Test(timeout = 5000)
+    public void showBlockingDismissesToastHotspotClickBeforeCheckingBackButton() throws InterruptedException {
+        Handler handler = new Handler();
+        MouseInput mouseInput = new MouseInput();
+        AchievementToast toast = new AchievementToast();
+        toast.activate();
+        toast.enqueue("Test Achievement");
+        toast.tick();
+        assertTrue("toast must actually be showing for isToastHotspot() to fire", toast.isShowingSomething());
+
+        Thread clicker = new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            deliverClick(mouseInput, 400, 20); // inside the toast's dismiss band (y < 50), clear of the Back button
+            deliverClick(mouseInput, 720, 590); // the real Back button
+        });
+        clicker.start();
+
+        RulesView.showBlocking(handler, mouseInput, toast);
+        clicker.join();
+
+        assertFalse("the first click (inside the toast band) must dismiss the toast rather than being ignored",
+                toast.isShowingSomething());
+    }
+
+    /** Synthesizes a left-click MouseEvent and delivers it straight to mouseInput's listener, same as an AWT click would. */
+    private static void deliverClick(MouseInput mouseInput, int x, int y) {
+        Component dummy = new Canvas();
+        mouseInput.mousePressed(new MouseEvent(dummy, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                0, x, y, 1, false, MouseEvent.BUTTON1));
     }
 }

@@ -1,5 +1,12 @@
 import org.junit.Test;
 
+import java.awt.Canvas;
+import java.awt.Component;
+import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,6 +48,24 @@ public class TestGame {
             //nothing is ever shown on screen and start()/stop() stay under
             //this test's manual control.
             Window.buildFrame(WIDTH, HEIGHT, "Ten to One", this);
+        }
+
+        /**
+         * ROADMAP item 2: points every test-constructed Game at a fresh
+         * JUnit-independent temp directory instead of the real
+         * {@code ~/.tentoone} -- mirrors buildWindow()/captureHumanName's
+         * existing testability-seam pattern. A fresh temp dir per instance
+         * (rather than a shared fixture) keeps each test's save state
+         * isolated from every other test in this file.
+         */
+        @Override
+        SaveStore buildSaveStore() {
+            try {
+                Path dir = Files.createTempDirectory("tentoone-test");
+                return new SaveStore(dir.resolve("save.properties"));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
 
         /**
@@ -116,7 +141,7 @@ public class TestGame {
      */
     @Test
     public void dealtHumanHandUsesPlayersOnScreenPosition() {
-        Human human = new Human("You", new MouseInput(), new Handler());
+        Human human = new Human("You", new MouseInput(), new Handler(), new AchievementToast(), new SaveData());
         //Game.renderPlayers positions the human at (WIDTH, HEIGHT - 150)
         //on the game-logic thread before any Round is constructed
         human.setX(Game.WIDTH);
@@ -130,6 +155,42 @@ public class TestGame {
 
         assertEquals(Game.WIDTH, human.getHand().getX());
         assertEquals(Game.HEIGHT - 150, human.getHand().getY());
+    }
+
+    /**
+     * ROADMAP item 2: FLAWLESS_GAME's real boundary -- play() accumulates
+     * roundsHitBonusThisGame by incrementing it once per round whose bonus
+     * was hit, then checks isFlawlessGame() against that running count at
+     * game-end. This drives that exact accumulate-then-threshold sequence
+     * over a simulated 10-round game (mirroring play()'s own
+     * `if (humanRow.bonusHit) roundsHitBonusThisGame++;` step) rather than
+     * just asserting isFlawlessGame(9)/isFlawlessGame(10) in isolation: 9 of
+     * 10 rounds hitting the bonus must NOT unlock FLAWLESS_GAME, only a
+     * clean 10-for-10 does.
+     */
+    @Test
+    public void flawlessGameRequiresAllTenRoundsToHitBonusNotNine() {
+        boolean[] nineOfTenRoundsHitBonus =
+                {true, true, true, true, true, true, true, true, true, false};
+        int roundsHitBonusThisGame = 0;
+        for (boolean bonusHit : nineOfTenRoundsHitBonus) {
+            if (bonusHit) {
+                roundsHitBonusThisGame++;
+            }
+        }
+        assertFalse("9 of 10 rounds hitting the bonus must not count as flawless",
+                Game.isFlawlessGame(roundsHitBonusThisGame));
+
+        boolean[] tenOfTenRoundsHitBonus =
+                {true, true, true, true, true, true, true, true, true, true};
+        roundsHitBonusThisGame = 0;
+        for (boolean bonusHit : tenOfTenRoundsHitBonus) {
+            if (bonusHit) {
+                roundsHitBonusThisGame++;
+            }
+        }
+        assertTrue("all 10 rounds hitting the bonus must count as flawless",
+                Game.isFlawlessGame(roundsHitBonusThisGame));
     }
 
     /**
@@ -281,7 +342,7 @@ public class TestGame {
     /** The hand persists between rounds, so every round must re-position it. */
     @Test
     public void redealtHumanHandIsRepositionedEachRound() {
-        Human human = new Human("You", new MouseInput(), new Handler());
+        Human human = new Human("You", new MouseInput(), new Handler(), new AchievementToast(), new SaveData());
         human.setX(Game.WIDTH);
         human.setY(Game.HEIGHT - 150);
 
@@ -305,5 +366,56 @@ public class TestGame {
 
         assertEquals(Game.WIDTH, human.getHand().getX());
         assertEquals(Game.HEIGHT - 150, human.getHand().getY());
+    }
+
+    /**
+     * Code-review Finding 1 (achievement-toast click-to-dismiss): awaitPlayAgain
+     * is the third of the three missed call sites -- and per the finding, the
+     * one this matters most for, since game-end streak/first-victory unlocks
+     * are enqueued right before the banner this loop guards ever shows. Same
+     * wiring-only smoke test as TestRulesView/TestAchievementsView's
+     * showBlocking tests -- AchievementToast's own predicates are already
+     * covered by TestAchievementToast. awaitPlayAgain was made package-private
+     * (from private) specifically so this test can drive it directly, mirroring
+     * this file's existing buildWindow/captureHumanName testability-seam
+     * convention.
+     */
+    @Test(timeout = 5000)
+    public void awaitPlayAgainDismissesToastHotspotClickBeforeCheckingPlayAgainHotspot() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        AchievementToast toast = game.getAchievementToast();
+        toast.activate();
+        toast.enqueue("Test Achievement");
+        toast.tick();
+        assertTrue("toast must actually be showing for isToastHotspot() to fire", toast.isShowingSomething());
+
+        Player winner = game.getPlayers().get(0);
+        GameOverBanner banner = new GameOverBanner(winner, true, new ArrayList<>(game.getPlayers()), false, 0);
+        MouseInput mouseInput = game.getMouseInput();
+
+        Thread clicker = new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            deliverClick(mouseInput, 400, 20); // inside the toast's dismiss band, clear of Play Again
+            deliverClick(mouseInput, 420, 477); // the real Play Again hotspot (see TestGameOverBanner)
+        });
+        clicker.start();
+
+        game.awaitPlayAgain(banner);
+        clicker.join();
+
+        assertFalse("the first click (inside the toast band) must dismiss the toast rather than being ignored",
+                toast.isShowingSomething());
+    }
+
+    /** Synthesizes a left-click MouseEvent and delivers it straight to mouseInput's listener, same as an AWT click would. */
+    private static void deliverClick(MouseInput mouseInput, int x, int y) {
+        Component dummy = new Canvas();
+        mouseInput.mousePressed(new MouseEvent(dummy, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                0, x, y, 1, false, MouseEvent.BUTTON1));
     }
 }

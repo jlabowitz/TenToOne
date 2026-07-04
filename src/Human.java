@@ -4,11 +4,20 @@ import java.util.List;
 public class Human extends Player{
     private final MouseInput mouseInput;
     private final Handler handler;
+    //ROADMAP follow-up: threaded through so the three click loops below can
+    //check the toast's click-to-dismiss hotspot (achievementToast) and open
+    //the in-game Achievements view (saveData), mirroring exactly how the
+    //existing Rules checks already work -- see Game's construction of this
+    //class for the shared instances passed in.
+    private final AchievementToast achievementToast;
+    private final SaveData saveData;
 
-    public Human(String name, MouseInput mouseInput, Handler handler) {
+    public Human(String name, MouseInput mouseInput, Handler handler, AchievementToast achievementToast, SaveData saveData) {
         super(name);
         this.mouseInput = mouseInput;
         this.handler = handler;
+        this.achievementToast = achievementToast;
+        this.saveData = saveData;
         id = ID.HUMAN;
     }
 
@@ -25,8 +34,17 @@ public class Human extends Player{
         try {
             while (true) {
                 Point click = mouseInput.awaitClick();
+                if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    achievementToast.dismiss();
+                    continue;
+                }
                 if (stepper.isRulesHotspot(click.x, click.y)) {
-                    RulesView.showBlocking(handler, mouseInput);
+                    RulesView.showBlocking(handler, mouseInput, achievementToast);
+                    mouseInput.clearClicks();
+                    continue;
+                }
+                if (stepper.isAchievementsHotspot(click.x, click.y)) {
+                    AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
                     mouseInput.clearClicks();
                     continue;
                 }
@@ -70,8 +88,17 @@ public class Human extends Player{
         try {
             while (true) {
                 Point click = mouseInput.awaitClick();
+                if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    achievementToast.dismiss();
+                    continue;
+                }
                 if (feedback.isRulesHotspot(click.x, click.y)) {
-                    RulesView.showBlocking(handler, mouseInput);
+                    RulesView.showBlocking(handler, mouseInput, achievementToast);
+                    mouseInput.clearClicks();
+                    continue;
+                }
+                if (feedback.isAchievementsHotspot(click.x, click.y)) {
+                    AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
                     mouseInput.clearClicks();
                     continue;
                 }
@@ -120,8 +147,17 @@ public class Human extends Player{
             mouseInput.clearClicks();
             while (true) {
                 Point click = mouseInput.awaitClick();
+                if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    achievementToast.dismiss();
+                    continue;
+                }
                 if (prompt.isRulesHotspot(click.x, click.y)) {
-                    RulesView.showBlocking(handler, mouseInput);
+                    RulesView.showBlocking(handler, mouseInput, achievementToast);
+                    mouseInput.clearClicks();
+                    continue;
+                }
+                if (prompt.isAchievementsHotspot(click.x, click.y)) {
+                    AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
                     mouseInput.clearClicks();
                     continue;
                 }

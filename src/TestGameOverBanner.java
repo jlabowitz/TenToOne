@@ -3,7 +3,9 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -22,7 +24,7 @@ public class TestGameOverBanner {
     private static GameOverBanner newBanner() {
         Player winner = new AI_Easy("Winner");
         List<Player> standings = Collections.singletonList(winner);
-        return new GameOverBanner(winner, false, standings);
+        return new GameOverBanner(winner, false, standings, false, 0);
     }
 
     @Test
@@ -66,5 +68,23 @@ public class TestGameOverBanner {
         // center of the panel's content span at the footer's baseline,
         // where "Game Over -- close this window to exit." is drawn
         assertFalse(banner.isPlayAgainHotspot(420, 430));
+    }
+
+    // --- ROADMAP item 2: winStreakLine, the pure text-computation helper
+    // backing the new high-score/win-streak lines ---
+
+    @Test
+    public void winStreakLineOnAWinReportsTheNewStreakCount() {
+        assertEquals("3-game win streak!", GameOverBanner.winStreakLine(true, 3));
+    }
+
+    @Test
+    public void winStreakLineOnALossWithAPriorStreakReportsWhereItEnded() {
+        assertEquals("Streak ended at 2.", GameOverBanner.winStreakLine(false, 2));
+    }
+
+    @Test
+    public void winStreakLineOnALossWithNoPriorStreakIsOmitted() {
+        assertNull("nothing meaningful to report if there was no active streak to lose", GameOverBanner.winStreakLine(false, 0));
     }
 }

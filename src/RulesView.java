@@ -64,17 +64,30 @@ public class RulesView extends GameObject {
     /**
      * Same lifecycle shape as BetStepper/NextTrickPrompt: add to the
      * Handler, block on clicks until the Back button is hit, remove in a
-     * finally. Called from two places by the backend pass (pre-launch from
-     * Game, mid-game from Human.nextTrick()) -- signature intentionally
-     * fixed, don't change it independently of those callers.
+     * finally. Called from several places (pre-launch from Game's Start
+     * Screen loop, mid-game from Human's three loops) -- signature
+     * intentionally fixed, don't change it independently of those callers.
+     *
+     * ACHIEVEMENTTOAST's click-to-dismiss hotspot is checked ahead of the
+     * Back button, code-review Finding 1: this view is one of the things
+     * AchievementToast's keepOnTop() renders on top of (see that class's
+     * doc), so a toast showing while this view is up must stay dismissible
+     * here too, not just from Human's mid-game loops. This is a no-op
+     * whenever the toast isn't actually showing (isToastHotspot() is gated
+     * on isShowingSomething()) -- including the pre-activate() Start Screen
+     * call site, where nothing is ever queued-and-visible yet.
      */
-    public static void showBlocking(Handler handler, MouseInput mouseInput) {
+    public static void showBlocking(Handler handler, MouseInput mouseInput, AchievementToast achievementToast) {
         RulesView view = new RulesView();
         handler.addObject(view);
         try {
             mouseInput.clearClicks();
             while (true) {
                 Point click = mouseInput.awaitClick();
+                if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    achievementToast.dismiss();
+                    continue;
+                }
                 if (view.isBackButton(click.x, click.y)) {
                     return;
                 }

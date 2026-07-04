@@ -20,9 +20,22 @@ import java.util.List;
 public class GameOverBanner extends ModalOverlay {
     private static final int TITLE_Y = 150;
     private static final int SUBTITLE_Y = 185;
-    private static final int HEADER_Y = 215;
-    private static final int DIVIDER_Y = 225;
-    private static final int FIRST_ROW_Y = 250;
+
+    /**
+     * ROADMAP item 2: two fixed line slots reserved between the subtitle and
+     * the standings header for the new high-score/win-streak lines -- always
+     * reserved, whether or not either line actually has content that round
+     * (same "reserve a fixed slot regardless of fill" convention RulesView's
+     * LEGEND_TOP/BOTTOM already established), so this doesn't need dynamic
+     * layout math. Everything below HEADER_Y shifted down accordingly from
+     * this item's pre-existing values (215/225/250) to make room.
+     */
+    private static final int NEW_HIGH_SCORE_Y = 202;
+    private static final int STREAK_LINE_Y = 220;
+
+    private static final int HEADER_Y = 244;
+    private static final int DIVIDER_Y = 254;
+    private static final int FIRST_ROW_Y = 278;
     private static final int ROW_PITCH = 26;
     private static final int FOOTER_Y = 430;
 
@@ -48,12 +61,43 @@ public class GameOverBanner extends ModalOverlay {
     private final int winnerScore;
     private final boolean humanWon;
     private final List<Player> standings;
+    private final boolean newHighScore;
+    private final int streakToReport;
 
-    public GameOverBanner(Player winner, boolean humanWon, List<Player> standings) {
+    /**
+     * ROADMAP item 2: newHighScore/streakToReport are pre-computed by the
+     * caller (Game, right after AchievementEngine.checkGameEnd updates
+     * SaveData) rather than derived here -- this class only renders what
+     * it's given. streakToReport is the *new* current win streak on a win,
+     * or the streak that just ended (0 if there wasn't one) on a loss -- see
+     * winStreakLine's own doc.
+     */
+    public GameOverBanner(Player winner, boolean humanWon, List<Player> standings,
+                           boolean newHighScore, int streakToReport) {
         this.winnerName = winner.getName();
         this.winnerScore = winner.getScore();
         this.humanWon = humanWon;
         this.standings = standings;
+        this.newHighScore = newHighScore;
+        this.streakToReport = streakToReport;
+    }
+
+    /**
+     * Pure text-computation helper, testable without a Graphics context.
+     * humanWon determines phrasing; streakToReport is the new current streak
+     * on a win, or the streak that just ended on a loss. Returns null (no
+     * line at all) on a loss with no prior streak (streakToReport == 0) --
+     * there's nothing meaningful to report ("Streak ended at 0" would read
+     * oddly for a streak that never existed).
+     */
+    static String winStreakLine(boolean humanWon, int streakToReport) {
+        if (humanWon) {
+            return streakToReport + "-game win streak!";
+        }
+        if (streakToReport > 0) {
+            return "Streak ended at " + streakToReport + ".";
+        }
+        return null;
     }
 
     @Override
@@ -75,6 +119,19 @@ public class GameOverBanner extends ModalOverlay {
                 ? "Final standings:"
                 : winnerName + " wins with " + winnerScore + " points. Final standings:";
         drawCentered(g, subtitle, SUBTITLE_Y);
+
+        if (newHighScore) {
+            g.setFont(defaultFont.deriveFont(Font.BOLD));
+            g.setColor(GOLD);
+            drawCentered(g, "New High Score!", NEW_HIGH_SCORE_Y);
+        }
+
+        String streakLine = winStreakLine(humanWon, streakToReport);
+        if (streakLine != null) {
+            g.setFont(defaultFont);
+            g.setColor(Color.BLACK);
+            drawCentered(g, streakLine, STREAK_LINE_Y);
+        }
 
         g.setFont(HEADER_FONT);
         g.drawString("Player", NAME_X, HEADER_Y);

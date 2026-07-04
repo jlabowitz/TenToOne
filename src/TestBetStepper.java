@@ -176,4 +176,65 @@ public class TestBetStepper {
         // doesn't collide with the Bet control's own row
         assertFalse(stepper.isRulesHotspot(770, 600));
     }
+
+    // ROADMAP follow-up: in-game Achievements hotspot, same y band as Rules,
+    // sitting to its left with a visible gap -- see BetStepper's
+    // ACHIEVEMENTS_* fields comment for how this geometry was derived.
+    private static final int ACHIEVEMENTS_TOP = 265;
+    private static final int ACHIEVEMENTS_BOTTOM = 295;
+    private static final int ACHIEVEMENTS_LEFT = 600;
+    private static final int ACHIEVEMENTS_RIGHT = 730;
+
+    @Test
+    public void clickInsideAchievementsHotspotReturnsTrue() {
+        BetStepper stepper = new BetStepper(10);
+        assertTrue(stepper.isAchievementsHotspot(665, 280));
+    }
+
+    @Test
+    public void achievementsHotspotLeftAndTopBoundaryIsInclusive() {
+        BetStepper stepper = new BetStepper(10);
+        assertTrue(stepper.isAchievementsHotspot(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP));
+    }
+
+    @Test
+    public void achievementsHotspotRightAndBottomBoundaryIsExclusive() {
+        BetStepper stepper = new BetStepper(10);
+        assertFalse(stepper.isAchievementsHotspot(ACHIEVEMENTS_RIGHT, 280));
+        assertFalse(stepper.isAchievementsHotspot(665, ACHIEVEMENTS_BOTTOM));
+        assertTrue(stepper.isAchievementsHotspot(ACHIEVEMENTS_RIGHT - 1, ACHIEVEMENTS_BOTTOM - 1));
+    }
+
+    @Test
+    public void clickOutsideAchievementsHotspotReturnsFalse() {
+        BetStepper stepper = new BetStepper(10);
+        assertFalse(stepper.isAchievementsHotspot(ACHIEVEMENTS_LEFT - 1, 280));
+        assertFalse(stepper.isAchievementsHotspot(665, ACHIEVEMENTS_TOP - 1));
+        // doesn't collide with this class's own DECREMENT/VALUE/INCREMENT/BET row
+        assertFalse(stepper.isAchievementsHotspot(665, 600));
+    }
+
+    /**
+     * Explicit non-collision proof (not just "eyeballed clear"): the new
+     * Achievements box must not intersect the existing Rules box, nor this
+     * class's own DECREMENT-through-BET control row -- this codebase has a
+     * documented history of exactly this kind of overlay-button pixel
+     * collision bug (see ROADMAP.md).
+     */
+    @Test
+    public void achievementsHotspotDoesNotOverlapRulesHotspotOrControlRow() {
+        assertFalse("Achievements box must not overlap the Rules box",
+                rectsOverlap(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM,
+                        RULES_LEFT, RULES_TOP, RULES_RIGHT, RULES_BOTTOM));
+        // this class's own control row: DECREMENT_LEFT (620) through BET_RIGHT (800), y=[TOP,BOTTOM)=[585,619)
+        assertFalse("Achievements box must not overlap this class's own control row",
+                rectsOverlap(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM,
+                        620, TOP, 800, BOTTOM));
+    }
+
+    /** Half-open rect intersection test: true iff [aLeft,aRight)x[aTop,aBottom) and [bLeft,bRight)x[bTop,bBottom) share any pixel. */
+    private static boolean rectsOverlap(int aLeft, int aTop, int aRight, int aBottom,
+                                         int bLeft, int bTop, int bRight, int bBottom) {
+        return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
+    }
 }

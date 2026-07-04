@@ -1,20 +1,27 @@
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Tests for StartScreen hit-testing and name-buffer editing (ROADMAP item 1).
+ * Tests for StartScreen hit-testing and name-buffer editing (ROADMAP item 1,
+ * extended by ROADMAP item 2 for the Achievements button/stat line).
  *
  * Layout contract (mirrors the approved design spec): Rules covers x in
  * [270, 390), y in [320, 354); Start Game covers x in [450, 570), y in
- * [320, 354); the name field itself (x in [270, 570), y in [260, 294)) is
- * not a click target and returns null.
+ * [320, 354); Achievements covers x in [340, 500), y in [370, 404); the name
+ * field itself (x in [270, 570), y in [260, 294)) is not a click target and
+ * returns null.
  */
 public class TestStartScreen {
     private static final int TOP = 320;
     private static final int BOTTOM = 354;
+    private static final int ACHIEVEMENTS_TOP = 370;
+    private static final int ACHIEVEMENTS_BOTTOM = 404;
+    private static final int ACHIEVEMENTS_LEFT = 340;
+    private static final int ACHIEVEMENTS_RIGHT = 500;
 
     @Test
     public void clickInsideRulesReturnsRules() {
@@ -88,6 +95,56 @@ public class TestStartScreen {
         StartScreen screen = new StartScreen();
         assertNull(screen.controlAt(0, 0));
         assertNull(screen.controlAt(420, 500));
+    }
+
+    // --- ROADMAP item 2: Achievements button ---
+
+    @Test
+    public void clickInsideAchievementsReturnsAchievements() {
+        StartScreen screen = new StartScreen();
+        assertEquals(StartScreen.Control.ACHIEVEMENTS, screen.controlAt(420, 385));
+    }
+
+    @Test
+    public void achievementsLeftAndTopBoundaryIsInclusive() {
+        StartScreen screen = new StartScreen();
+        assertEquals(StartScreen.Control.ACHIEVEMENTS, screen.controlAt(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP));
+    }
+
+    @Test
+    public void achievementsRightAndBottomBoundaryIsExclusive() {
+        StartScreen screen = new StartScreen();
+        assertNull(screen.controlAt(ACHIEVEMENTS_RIGHT, 385));
+        assertNull(screen.controlAt(420, ACHIEVEMENTS_BOTTOM));
+        assertEquals(StartScreen.Control.ACHIEVEMENTS,
+                screen.controlAt(ACHIEVEMENTS_RIGHT - 1, ACHIEVEMENTS_BOTTOM - 1));
+    }
+
+    @Test
+    public void clickAboveOrBelowAchievementsReturnsNull() {
+        StartScreen screen = new StartScreen();
+        assertNull(screen.controlAt(420, ACHIEVEMENTS_TOP - 1));
+        assertNull(screen.controlAt(420, ACHIEVEMENTS_BOTTOM));
+    }
+
+    // --- ROADMAP item 2: stat line, only shown once gamesPlayed > 0 ---
+
+    @Test
+    public void noArgConstructorDefaultsToNoStatsShown() {
+        StartScreen screen = new StartScreen();
+        assertFalse(screen.hasStatsToShow());
+    }
+
+    @Test
+    public void statsConstructorWithZeroGamesPlayedHidesStatLine() {
+        StartScreen screen = new StartScreen(0, 0, 0);
+        assertFalse(screen.hasStatsToShow());
+    }
+
+    @Test
+    public void statsConstructorWithGamesPlayedShowsStatLine() {
+        StartScreen screen = new StartScreen(12, 87, 4);
+        assertTrue(screen.hasStatsToShow());
     }
 
     @Test

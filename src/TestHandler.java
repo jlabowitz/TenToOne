@@ -2,6 +2,9 @@ import org.junit.Test;
 
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
@@ -36,6 +39,27 @@ public class TestHandler {
         @Override
         public void render(Graphics g) {
             renderCount++;
+        }
+    }
+
+    /** Records its own NAME onto a shared list every time render() runs, so a test can assert on relative render order across objects, not just call counts. */
+    private static class OrderRecordingObject extends GameObject {
+        final String name;
+        final List<String> renderOrder;
+
+        OrderRecordingObject(String name, List<String> renderOrder) {
+            this.name = name;
+            this.renderOrder = renderOrder;
+        }
+
+        @Override
+        public void tick() {
+            //not exercised by the render-order tests below
+        }
+
+        @Override
+        public void render(Graphics g) {
+            renderOrder.add(name);
         }
     }
 
@@ -113,5 +137,70 @@ public class TestHandler {
         assertEquals(1, mutator.tickCount);
         assertEquals(1, victim.tickCount);
         assertEquals(1, tail.tickCount);
+    }
+
+    /**
+     * Regression test for a review finding on ROADMAP item 2
+     * (AchievementToast): render() paints strictly in insertion order, so a
+     * later-added full-canvas object (a stand-in here for RoundSummaryPanel/
+     * GameOverBanner/RulesView/AchievementsView/StartScreen) always used to
+     * paint over an earlier-added one -- which meant a toast added once,
+     * up-front, was invisible for the entire (unbounded, user-paced)
+     * duration of literally every modal shown afterward. keepOnTop()
+     * re-bumps its registered object to the end of the list every time
+     * anything else is added, so it renders last across any number of
+     * later-added/removed objects, not just the first one.
+     */
+    @Test
+    public void keptOnTopObjectRendersLastEvenAsLaterObjectsComeAndGo() {
+        Handler handler = new Handler();
+        List<String> renderOrder = new ArrayList<>();
+        OrderRecordingObject toast = new OrderRecordingObject("toast", renderOrder);
+        OrderRecordingObject roundSummary = new OrderRecordingObject("roundSummary", renderOrder);
+        OrderRecordingObject gameOverBanner = new OrderRecordingObject("gameOverBanner", renderOrder);
+
+        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics g = image.getGraphics();
+
+        // toast registered first, mirroring Game's constructor -- this is
+        // exactly the ordering that used to bury it permanently.
+        handler.keepOnTop(toast);
+        handler.addObject(roundSummary);
+        handler.render(g);
+        assertEquals("toast must render after (on top of) the round summary panel",
+                Arrays.asList("roundSummary", "toast"), renderOrder);
+
+        // a later, unrelated modal (the round summary panel is dismissed,
+        // the game-over banner shown instead) must still render underneath
+        // the toast -- proving this isn't a one-shot fix that only helps the
+        // very next object added.
+        renderOrder.clear();
+        handler.removeObject(roundSummary);
+        handler.addObject(gameOverBanner);
+        handler.render(g);
+        assertEquals("toast must stay on top of whatever's added later too",
+                Arrays.asList("gameOverBanner", "toast"), renderOrder);
+
+        g.dispose();
+    }
+
+    /**
+     * If the kept-on-top object is itself removed, later addObject() calls
+     * must not resurrect it -- removeObject() clears the registration so a
+     * stale reference to an object no longer in play doesn't get silently
+     * re-added forever.
+     */
+    @Test
+    public void removingTheKeptOnTopObjectStopsItFromBeingReBumped() {
+        Handler handler = new Handler();
+        RecordingObject toast = new RecordingObject();
+        RecordingObject other = new RecordingObject();
+        handler.keepOnTop(toast);
+
+        handler.removeObject(toast);
+        handler.addObject(other);
+        handler.tick();
+
+        assertEquals("removed kept-on-top object must not be ticked again", 0, toast.tickCount);
     }
 }

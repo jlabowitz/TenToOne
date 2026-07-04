@@ -28,7 +28,7 @@ import java.awt.*;
  * write-one-thread/read-another-thread convention).
  */
 public class StartScreen extends GameObject implements TypingTarget {
-    public enum Control { RULES, START }
+    public enum Control { RULES, START, ACHIEVEMENTS }
 
     /**
      * Verified via actual FontMetrics measurement, not the design spec's
@@ -67,6 +67,17 @@ public class StartScreen extends GameObject implements TypingTarget {
     private static final int START_TOP = 320, START_BOTTOM = 354;
     private static final int START_LEFT = 450, START_RIGHT = 570;
 
+    /**
+     * ROADMAP item 2: Achievements button, its own row below Rules/Start.
+     * Width (160px) matches GameOverBanner's Play Again button for visual
+     * consistency across this project's button conventions.
+     */
+    private static final int ACHIEVEMENTS_TOP = 370, ACHIEVEMENTS_BOTTOM = 404;
+    private static final int ACHIEVEMENTS_LEFT = 340, ACHIEVEMENTS_RIGHT = 500;
+
+    /** ROADMAP item 2: the "Best score / best win streak / games played" summary line, only shown once gamesPlayed > 0. */
+    private static final int STATS_Y = 430;
+
     private static final int FOOTER_Y = 560;
 
     /** ~0.5s at 60 ticks/sec -- matches IllegalPlayFeedback/BetStepper's tick-rate assumption. */
@@ -77,8 +88,34 @@ public class StartScreen extends GameObject implements TypingTarget {
     private boolean cursorVisible = true;
 
     /**
+     * ROADMAP item 2: current stats, passed in by Game.runStartScreen() so
+     * this screen can render its always-visible stat line. The no-arg
+     * constructor (used by every pre-item-2 caller/test) defaults gamesPlayed
+     * to 0, which hasStatsToShow() treats as "hide the stat line" -- exactly
+     * the fresh-save state where there's nothing yet to report.
+     */
+    private final int gamesPlayed;
+    private final int highScore;
+    private final int bestWinStreakEver;
+
+    public StartScreen() {
+        this(0, 0, 0);
+    }
+
+    public StartScreen(int gamesPlayed, int highScore, int bestWinStreakEver) {
+        this.gamesPlayed = gamesPlayed;
+        this.highScore = highScore;
+        this.bestWinStreakEver = bestWinStreakEver;
+    }
+
+    /** True once there's at least one recorded game to summarize -- gates the stat line's visibility. */
+    public boolean hasStatsToShow() {
+        return gamesPlayed > 0;
+    }
+
+    /**
      * Returns the control at pixel (px, py), or null if the point hits no
-     * control (the name field itself, a gap, or outside both buttons
+     * control (the name field itself, a gap, or outside every button
      * entirely). Half-open rects, same convention as BetStepper.controlAt.
      */
     public Control controlAt(int px, int py) {
@@ -87,6 +124,9 @@ public class StartScreen extends GameObject implements TypingTarget {
         }
         if (px >= START_LEFT && px < START_RIGHT && py >= START_TOP && py < START_BOTTOM) {
             return Control.START;
+        }
+        if (px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT && py >= ACHIEVEMENTS_TOP && py < ACHIEVEMENTS_BOTTOM) {
+            return Control.ACHIEVEMENTS;
         }
         return null;
     }
@@ -167,6 +207,18 @@ public class StartScreen extends GameObject implements TypingTarget {
 
         g.drawRect(START_LEFT, START_TOP, START_RIGHT - START_LEFT - 1, START_BOTTOM - START_TOP - 1);
         drawCenteredIn(g, "Start Game", START_LEFT, START_RIGHT, START_BOTTOM - 10);
+
+        g.setColor(Color.BLACK);
+        g.drawRect(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT - ACHIEVEMENTS_LEFT - 1, ACHIEVEMENTS_BOTTOM - ACHIEVEMENTS_TOP - 1);
+        drawCenteredIn(g, "Achievements", ACHIEVEMENTS_LEFT, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM - 10);
+
+        if (hasStatsToShow()) {
+            g.setColor(Color.DARK_GRAY);
+            String stats = "Best score: " + highScore
+                    + " · Best win streak: " + bestWinStreakEver
+                    + " · Games played: " + gamesPlayed;
+            drawCentered(g, stats, STATS_Y);
+        }
 
         g.setColor(Color.BLACK);
         // "16" in the design spec's illustrative copy was written against an

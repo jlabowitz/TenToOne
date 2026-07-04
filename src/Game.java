@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 /***
  Each game has up to 5 players and consists of 10 rounds with the number of cards in hand decreasing from 10 to 1.
@@ -33,6 +34,32 @@ public class Game extends Canvas implements Runnable{
     //a constructor parameter only before, never stored.
     private final List<String> aiNames;
 
+    //ROADMAP item 2 (achievement system): loaded once at construction, saved
+    //again after every round-end/game-end/name-submission hook -- see
+    //SaveStore's class doc for why this is never deferred to process exit.
+    private final SaveStore saveStore;
+    private final SaveData saveData;
+
+    //ROADMAP item 2: long-lived for the whole session (registered with the
+    //Handler once in the constructor via keepOnTop(), never removed --
+    //mirrors how `players` stay registered across Play-Again per
+    //restartForNewGame()'s own doc) so an achievement queued during the
+    //Start Screen (the Bapi easter egg fires at name-submission time,
+    //before any Round exists) is never dropped. keepOnTop() (see Handler's
+    //class doc) keeps it rendering above every full-canvas modal that comes
+    //and goes over the session -- RoundSummaryPanel, GameOverBanner,
+    //RulesView, AchievementsView, StartScreen -- not just whichever one
+    //happened to exist when the toast was first added. Only starts actually
+    //ticking/rendering once play() calls activate() -- see AchievementToast's
+    //class doc.
+    private final AchievementToast achievementToast;
+
+    //ROADMAP item 2: ephemeral per-game tracking for FLAWLESS_GAME/
+    //COMEBACK_KID -- reset every new game by restartForNewGame(), not
+    //persisted (SaveData only stores permanent unlock state).
+    private int roundsHitBonusThisGame;
+    private boolean wasSoleLastAtHalfway;
+
     //AI-only: the human's name is captured live via the Start Screen
     //(captureHumanName), not passed in as a list slot -- see the constructor.
     private static final List<String> names = new ArrayList<>() {{
@@ -56,6 +83,17 @@ public class Game extends Canvas implements Runnable{
         new Window(WIDTH, HEIGHT, "Ten to One", this);
     }
 
+    /**
+     * ROADMAP item 2: new seam, package-private and non-final, mirroring
+     * buildWindow()/captureHumanName()'s existing testability pattern -- a
+     * test subclass overrides this to point at a temp file instead of the
+     * real {@code ~/.tentoone}, so constructing a (Headless)Game in a test
+     * never touches the real save file.
+     */
+    SaveStore buildSaveStore() {
+        return new SaveStore();
+    }
+
     public Game(List<String> aiNames) {
         handler = new Handler();
         mouseInput = new MouseInput();
@@ -63,6 +101,12 @@ public class Game extends Canvas implements Runnable{
         this.addMouseListener(mouseInput);
         this.addKeyListener(keyInput);
         this.setFocusable(true);
+
+        saveStore = buildSaveStore();
+        saveData = saveStore.load();
+        achievementToast = new AchievementToast();
+        handler.keepOnTop(achievementToast);
+
         buildWindow();
 
         //handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
@@ -74,7 +118,7 @@ public class Game extends Canvas implements Runnable{
         assert numPlayers <= 5 : "You cannot have more than 5 players";
 
         players = new ArrayList<>();
-        players.add(new Human(humanName, mouseInput, handler));
+        players.add(new Human(humanName, mouseInput, handler, achievementToast, saveData));
         for (String aiName : aiNames) {
             players.add(new AI_Easy(aiName));
         }
@@ -102,7 +146,11 @@ public class Game extends Canvas implements Runnable{
      * a partially-typed name survives visiting Rules and coming back.
      */
     private String runStartScreen(List<String> aiNames) {
-        StartScreen startScreen = new StartScreen();
+        //ROADMAP item 2: the stat line's data is a snapshot of saveData as of
+        //this StartScreen's construction -- fine, since saveData only
+        //changes via this same class's round-end/game-end/name-submission
+        //hooks, none of which run while a StartScreen is on screen.
+        StartScreen startScreen = new StartScreen(saveData.gamesPlayed, saveData.highScore, saveData.bestWinStreakEver);
         handler.addObject(startScreen);
         keyInput.setTarget(startScreen);
         this.requestFocusInWindow();
@@ -116,12 +164,26 @@ public class Game extends Canvas implements Runnable{
                 }
                 switch (control) {
                     case RULES:
-                        RulesView.showBlocking(handler, mouseInput);
+                        RulesView.showBlocking(handler, mouseInput, achievementToast);
+                        mouseInput.clearClicks();
+                        continue;
+                    case ACHIEVEMENTS:
+                        AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
                         mouseInput.clearClicks();
                         continue;
                     case START:
                         String typedName = startScreen.getName().trim();
                         if (!typedName.isEmpty()) {
+                            //ROADMAP item 2: the Bapi easter egg, checked at
+                            //name-submission time -- same permanent-unlock
+                            //semantics as every other achievement, so
+                            //re-entering "Bapi" after it's already unlocked
+                            //is a no-op here (checkNameSubmission returns
+                            //false) and doesn't re-fire the toast.
+                            if (AchievementEngine.checkNameSubmission(saveData, typedName)) {
+                                saveStore.save(saveData);
+                                achievementToast.enqueue(Achievement.BAPI_EASTER_EGG);
+                            }
                             return typedName;
                         }
                         continue;
@@ -139,6 +201,13 @@ public class Game extends Canvas implements Runnable{
 
     private void play() {
         renderPlayers();
+        //ROADMAP item 2: real gameplay begins here -- flips the toast queue
+        //live so anything enqueued during the Start Screen (the Bapi easter
+        //egg fires at name-submission time, before this point) renders on
+        //the first frame of actual play rather than during/underneath the
+        //Start Screen or the transition into it. See AchievementToast's
+        //class doc.
+        achievementToast.activate();
         //ROADMAP item 1 (play-again restart): outer loop runs forever --
         //the only way this process ever exits is the player closing the
         //window (Window.java sets JFrame.EXIT_ON_CLOSE), same as before this
@@ -170,6 +239,32 @@ public class Game extends Canvas implements Runnable{
                 printScores();
                 applyTotals(results, getPlayers());
 
+                //ROADMAP item 2: round-end achievement checks -- SCORE_OVER_50/
+                //_100 against the human's running score, PERFECT_ROUND for this
+                //round's bonus hit, plus the two pieces of ephemeral per-game
+                //state FLAWLESS_GAME/COMEBACK_KID need at game-end. Written to
+                //disk immediately after (not deferred to game-end), matching
+                //this feature's "no clean-shutdown hook" design.
+                RoundResultRow humanRow = results.stream().filter(row -> row.isHuman).findFirst()
+                        .orElseThrow(() -> new IllegalStateException("No human row in round results"));
+                List<Achievement> newlyUnlockedThisRound =
+                        AchievementEngine.checkRoundEnd(saveData, humanRow.totalAfter, humanRow.bonusHit);
+                if (humanRow.bonusHit) {
+                    roundsHitBonusThisGame++;
+                }
+                //Round-5 halfway snapshot: roundIndex is still 4 here (it
+                //increments below, after this block), i.e. this is right
+                //after the round where roundIndex was 4 -- the 5th of 10.
+                if (roundIndex == 4) {
+                    List<Integer> otherScores = results.stream()
+                            .filter(row -> !row.isHuman)
+                            .map(row -> row.totalAfter)
+                            .collect(Collectors.toList());
+                    wasSoleLastAtHalfway = AchievementEngine.isSoleLastPlace(humanRow.totalAfter, otherScores);
+                }
+                saveStore.save(saveData);
+                achievementToast.enqueueAll(newlyUnlockedThisRound);
+
                 showRoundSummary(roundIndex, results);
 
                 roundStartingPlayer = nextPlayer(roundStartingPlayer);
@@ -178,7 +273,29 @@ public class Game extends Canvas implements Runnable{
             //determine winner
             Player winner = determineWinner();
             System.out.println(winner.getName() + " won the game!");
-            GameOverBanner banner = showGameOverBanner(winner);
+
+            //ROADMAP item 2: game-end achievement/stat checks -- updates
+            //gamesPlayed/gamesWon/highScore/currentWinStreak/bestWinStreakEver
+            //and checks FIRST_VICTORY/TEN_GAMES_PLAYED/WIN_STREAK_3/5/10/
+            //FLAWLESS_GAME/COMEBACK_KID, all *before* showGameOverBanner so the
+            //banner can reflect the just-updated values (new-high-score/
+            //streak lines).
+            boolean humanWon = isHumanWinner(winner);
+            Player human = getHumanPlayer();
+            int finalHumanScore = human.getScore();
+            int previousHighScore = saveData.highScore;
+            int previousWinStreak = saveData.currentWinStreak;
+            boolean flawlessGame = isFlawlessGame(roundsHitBonusThisGame);
+
+            List<Achievement> newlyUnlockedThisGame = AchievementEngine.checkGameEnd(
+                    saveData, humanWon, finalHumanScore, flawlessGame, wasSoleLastAtHalfway);
+            saveStore.save(saveData);
+            achievementToast.enqueueAll(newlyUnlockedThisGame);
+
+            boolean newHighScore = finalHumanScore > previousHighScore;
+            int streakToReport = humanWon ? saveData.currentWinStreak : previousWinStreak;
+
+            GameOverBanner banner = showGameOverBanner(winner, newHighScore, streakToReport);
             awaitPlayAgain(banner);
             handler.removeObject(banner);
             restartForNewGame();
@@ -191,15 +308,39 @@ public class Game extends Canvas implements Runnable{
      * (e.g. a miss-click elsewhere on the frozen banner) is silently
      * ignored -- matches every other hotspot's convention in this codebase,
      * no error feedback on a miss-click.
+     *
+     * Code-review Finding 1: also checks ACHIEVEMENTTOAST's click-to-dismiss
+     * hotspot ahead of the Play Again check, same as RulesView/
+     * AchievementsView's showBlocking loops -- this is exactly the screen
+     * (game-end streak/first-victory unlocks are enqueued right before the
+     * banner shows) the feature most needed to be dismissible on, per that
+     * finding. Package-private (not private), mirroring
+     * buildWindow/captureHumanName's existing testability-seam pattern, so
+     * TestGame can drive this directly -- see getMouseInput/
+     * getAchievementToast below.
      */
-    private void awaitPlayAgain(GameOverBanner banner) {
+    void awaitPlayAgain(GameOverBanner banner) {
         mouseInput.clearClicks();
         while (true) {
             Point click = mouseInput.awaitClick();
+            if (achievementToast.isToastHotspot(click.x, click.y)) {
+                achievementToast.dismiss();
+                continue;
+            }
             if (banner.isPlayAgainHotspot(click.x, click.y)) {
                 return;
             }
         }
+    }
+
+    /** Test-only accessor (package-private) -- see awaitPlayAgain's dismiss-wiring test in TestGame. */
+    MouseInput getMouseInput() {
+        return mouseInput;
+    }
+
+    /** Test-only accessor (package-private) -- see awaitPlayAgain's dismiss-wiring test in TestGame. */
+    AchievementToast getAchievementToast() {
+        return achievementToast;
     }
 
     /**
@@ -222,6 +363,12 @@ public class Game extends Canvas implements Runnable{
         //constructor's original logic exactly, confirmed by game-designer as
         //the fairer, more legible choice.
         roundStartingPlayer = new Random().nextInt(numPlayers());
+
+        //ROADMAP item 2: fresh per-game achievement tracking for the new game
+        //-- these are ephemeral (not persisted), so a new game must start
+        //clean rather than carrying over the just-finished game's counts.
+        roundsHitBonusThisGame = 0;
+        wasSoleLastAtHalfway = false;
 
         String humanName = captureHumanName(aiNames);
         getPlayers().stream()
@@ -255,6 +402,21 @@ public class Game extends Canvas implements Runnable{
         for (Player player : getPlayers()) {
             System.out.println(player.getName() + " has " + player.getScore() + " points.");
         }
+    }
+
+    /**
+     * ROADMAP item 2: FLAWLESS_GAME's real boundary -- true only if every
+     * one of the game's 10 rounds hit the bonus, not e.g. 9 of 10.
+     * roundsHitBonusThisGame is accumulated round-by-round in play()'s loop
+     * (incremented once per round whose bonus was hit) and this is checked
+     * once at game-end. Pulled out as its own package-private + static
+     * method, mirroring snapshotRoundResults/applyTotals's existing
+     * testability-seam pattern, so this exact "all 10, not almost-all"
+     * threshold is unit-testable without driving play()'s full
+     * click-scripted 10-round loop.
+     */
+    static boolean isFlawlessGame(int roundsHitBonusThisGame) {
+        return roundsHitBonusThisGame == 10;
     }
 
     /**
@@ -308,17 +470,13 @@ public class Game extends Canvas implements Runnable{
      * value lets the caller pass this exact instance to awaitPlayAgain and
      * then hand it back to handler.removeObject().
      */
-    private GameOverBanner showGameOverBanner(Player winner) {
-        boolean humanWon = getPlayers().stream()
-                .filter(p -> p.getID() == ID.HUMAN)
-                .findFirst()
-                .map(human -> human == winner)
-                .orElse(false);
+    private GameOverBanner showGameOverBanner(Player winner, boolean newHighScore, int streakToReport) {
+        boolean humanWon = isHumanWinner(winner);
         //stable sort (List.sort/TimSort) so ties keep seat order, not an
         //arbitrary reordering
         List<Player> standings = new ArrayList<>(getPlayers());
         standings.sort(Comparator.comparingInt(Player::getScore).reversed());
-        GameOverBanner banner = new GameOverBanner(winner, humanWon, standings);
+        GameOverBanner banner = new GameOverBanner(winner, humanWon, standings, newHighScore, streakToReport);
         handler.addObject(banner);
         return banner;
     }
@@ -331,6 +489,27 @@ public class Game extends Canvas implements Runnable{
             }
         }
         return winner;
+    }
+
+    /**
+     * ROADMAP item 2: shared by play()'s game-end achievement checks and
+     * showGameOverBanner (which used to compute this same thing inline) --
+     * true if the given winner is the human seat, not an AI.
+     */
+    private boolean isHumanWinner(Player winner) {
+        return getPlayers().stream()
+                .filter(p -> p.getID() == ID.HUMAN)
+                .findFirst()
+                .map(human -> human == winner)
+                .orElse(false);
+    }
+
+    /** ROADMAP item 2: the human player is always seated first (see the constructor), but looked up defensively rather than assuming index 0. */
+    private Player getHumanPlayer() {
+        return getPlayers().stream()
+                .filter(p -> p.getID() == ID.HUMAN)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No human player found"));
     }
 
     //Improve

@@ -35,6 +35,25 @@ public class BetStepper extends GameObject {
     private static final int RULES_TOP = 265, RULES_BOTTOM = 295;
     private static final int RULES_LEFT = 760, RULES_RIGHT = 820;
 
+    // ROADMAP follow-up: in-game Achievements hotspot, mirroring the Rules
+    // hotspot above -- same y band (verified clear of this class's own
+    // DECREMENT/VALUE/INCREMENT/BET row at y=[585,619)), sitting to its left
+    // with a visible gap on both sides. Left edge (600) was measured, not
+    // eyeballed: with this class's centered prompt text N/A here (BetStepper
+    // renders no centered banner in this band, only its own controls at
+    // y=585-619) the binding constraint is the *other* two classes sharing
+    // this exact geometry (IllegalPlayFeedback/NextTrickPrompt), whose
+    // longest centered message ends at x=567 (measured via headless
+    // FontMetrics, bold default font) -- 600 leaves a 33px gap from that, and
+    // 730 leaves a 30px gap before RULES_LEFT (760). "Achievements" (12
+    // chars) is much wider than "Rules" (5): this box is sized to 130px
+    // (vs. Rules' 60px) so the label has the same kind of padding headroom
+    // Rules gets, not a tight fit -- see TestBetStepper's non-collision test
+    // for the geometry proof.
+    private static final String ACHIEVEMENTS_LABEL = "Achievements";
+    private static final int ACHIEVEMENTS_TOP = 265, ACHIEVEMENTS_BOTTOM = 295;
+    private static final int ACHIEVEMENTS_LEFT = 600, ACHIEVEMENTS_RIGHT = 730;
+
     private final int maxBet;
     private int value;
 
@@ -91,6 +110,16 @@ public class BetStepper extends GameObject {
         return px >= RULES_LEFT && px < RULES_RIGHT && py >= RULES_TOP && py < RULES_BOTTOM;
     }
 
+    /**
+     * Half-open rect hit-test for the Achievements hotspot, same convention
+     * as isRulesHotspot. See the ACHIEVEMENTS_* fields' comment for how this
+     * geometry was chosen clear of the Rules box and this class's own
+     * control row.
+     */
+    public boolean isAchievementsHotspot(int px, int py) {
+        return px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT && py >= ACHIEVEMENTS_TOP && py < ACHIEVEMENTS_BOTTOM;
+    }
+
     @Override
     public void tick() {
 
@@ -116,5 +145,10 @@ public class BetStepper extends GameObject {
         int labelWidth = metrics.stringWidth(RULES_LABEL);
         int labelX = RULES_LEFT + ((RULES_RIGHT - RULES_LEFT) - labelWidth) / 2;
         g.drawString(RULES_LABEL, labelX, RULES_BOTTOM - 10);
+
+        g.drawRect(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT - ACHIEVEMENTS_LEFT - 1, ACHIEVEMENTS_BOTTOM - ACHIEVEMENTS_TOP - 1);
+        int achievementsLabelWidth = metrics.stringWidth(ACHIEVEMENTS_LABEL);
+        int achievementsLabelX = ACHIEVEMENTS_LEFT + ((ACHIEVEMENTS_RIGHT - ACHIEVEMENTS_LEFT) - achievementsLabelWidth) / 2;
+        g.drawString(ACHIEVEMENTS_LABEL, achievementsLabelX, ACHIEVEMENTS_BOTTOM - 10);
     }
 }

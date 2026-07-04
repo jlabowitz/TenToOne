@@ -31,7 +31,7 @@ that item — this is "skip by default," not "never run."
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
 | 1 | AI & polish | ready — **user wants to scope this directly with `game-designer` before any implementation starts** | M, open-ended | `game-designer` → `senior-backend-developer` |
-| 2 | Achievement system (persistent local storage) | ready — **higher priority** (user-flagged) | M | `game-designer` → `senior-backend-developer` + `senior-frontend-developer` |
+| 2 | Achievement system (persistent local storage) | ready — **higher priority**, design finalized 2026-07-04 | M | `game-designer` → `senior-developer` |
 | 3 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
 | 4 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
 | 5 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
@@ -42,6 +42,9 @@ that item — this is "skip by default," not "never run."
 | 10 | Replay/score history (persistent storage) | ready | S-M | `senior-backend-developer` + `senior-frontend-developer` |
 | 11 | Difficulty tiers: freeplay vs. journey mode | blocked — depends on item 1 | M-L, open-ended | agent TBD |
 | 12 | Distributable executable + GitHub Release | deferred | S-M | `senior-backend-developer` |
+| 13 | Bapi visual/wording flourish | deferred | S | agent TBD |
+| 14 | "OP"/"Cheater" guaranteed-best-cards easter egg | deferred | unclear | agent TBD |
+| 15 | Achievement toast redesign (box notification, non-fading, click-to-highlight) | deferred | S-M | `game-designer` → `senior-developer` |
 
 All live visual sanity checks previously owed here (invalid-move feedback,
 start screen/rules/name entry) were walked by the user once back at their
@@ -118,27 +121,68 @@ conversation rather than treating them as separate items:
 - Item 11 below (difficulty tiers / journey mode) depends on whatever
   AI-tier structure comes out of this conversation — see that item.
 
-### 2. Achievement system (persistent local storage) — `ready` — **higher priority** — M — `game-designer` → `senior-backend-developer` + `senior-frontend-developer`
+### 2. Achievement system (persistent local storage) — `ready` — **higher priority** — M — `game-designer` → `senior-developer`
 Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #2, explicitly
-flagged by the user as "(Higher priority)"). Wants a local
-persistent-storage-backed achievement system: a high-score indicator, a
-win-streak counter, and milestone achievements (e.g. "win 10 in a row,"
-"score over 50," "score over 100"). Needs a local storage mechanism that
-survives across game restarts — no such persistence exists anywhere in the
-codebase today, this is the first feature that needs it.
+flagged by the user as "(Higher priority)"). Local persistent-storage-backed
+achievement system: a high-score indicator, a win-streak counter, and
+milestone achievements. **Design finalized 2026-07-04** after two
+`game-designer` spec passes plus user review — ready to implement directly,
+no further design round-trip needed.
 
-**Open question, deliberately left unresolved per user instruction:** the
-user wants easter-egg achievements tied to special player names (e.g.
-naming yourself something specific unlocks a hidden achievement) but said
-explicitly: "ask me about this when we come to it, and I'll give some
-examples." Whoever picks this item up should raise that question with the
-user before designing the easter-egg part — do not invent example names or
-achievements.
+**Storage:** a `java.util.Properties` file at
+`<user.home>/.tentoone/save.properties` — deliberately not repo-relative, so
+it survives regardless of launch directory (including a future `jpackage`
+distributable, item 12). Written atomically (temp file + `ATOMIC_MOVE`)
+since this project's dev workflow routinely force-kills the running
+process; includes a `saveFormatVersion` key as a migration escape hatch.
+Read once at startup; written after game-end, round-end (for round-level
+score/bonus checks), and name-submission (for the Bapi check) rather than
+deferred to process exit, since there's no clean-shutdown hook today.
+Shares its `.tentoone` directory with item 10 (Replay/score history) via a
+small reusable "resolve app-data dir" utility, without designing item 10's
+own file format here.
+
+**Forward-compatible with future multi-profile support:** the user has
+floated (and added to `SUGGESTIONS.md`) wanting multiple named profiles
+later, each with their own achievements. Not in scope now, but the
+save-path resolution should be a parameterized function (e.g.
+`resolveSaveFile(profileName)`, defaulting to one implicit profile) so that
+adding real profile support later means pointing that function at a
+different file per profile, not migrating the save format or rewriting the
+storage layer.
+
+**Milestone achievements (10 total, non-hidden — plus the hidden Bapi
+achievement below, 11 including it):** `FIRST_VICTORY` (win your
+first game), `TEN_GAMES_PLAYED` (play 10 games total), `WIN_STREAK_3`/`_5`/
+`_10` (win-streak tiers), `SCORE_OVER_50`/`_100` (single-game score
+thresholds — a third `SCORE_OVER_150` tier was scoped and then dropped by
+the user: max theoretical score is 155, requiring winning literally every
+trick in the game, which is practically unreachable without exceptional
+hand RNG), `PERFECT_ROUND` (hit the bet bonus once) and its harder
+counterpart `FLAWLESS_GAME` (hit it in all 10 rounds), and `COMEBACK_KID`
+(sole last place at the round-5 halfway point, then win the game).
+
+**Bapi easter egg (in scope, fully specified):** entering the player name
+"Bapi" (case-insensitive, exact match only — not a substring match) unlocks
+a hidden achievement, `BAPI_EASTER_EGG` ("One and Only"). This is a pet name
+for the user's partner. Checked at name-submission time
+(`Game.runStartScreen()`'s `case START:` branch), same permanent-unlock
+semantics as every other achievement. **Explicitly deferred, not this
+pass:** any visual/wording flourish tied to that name (background tint,
+special phrasing) — see new item 13 below.
+
+**Stats screen:** yes — a small always-visible stat line on the Start
+Screen (best score/streak/games played) plus a new "Achievements" button
+opening a full list (locked/unlocked; hidden achievements omitted until
+unlocked), reusing the existing `RulesView.showBlocking` modal pattern.
+Mid-session unlocks show as a toast reusing the `IllegalPlayFeedback`
+hold/fade pattern, queued rather than overwrite-in-place (two achievements
+can unlock in the same instant).
 
 Note: shares a "needs local persistent storage" dependency with item 10
-(Replay/score history) below — worth scoping the storage mechanism (format,
-file location, read/write timing) once, for both features, rather than
-building two separate ad hoc persistence layers.
+(Replay/score history) below — the storage mechanism above (format, file
+location, read/write timing) is designed to serve both rather than building
+two separate ad hoc persistence layers.
 
 ### 3. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
@@ -295,6 +339,56 @@ plain app-image skips that but ships as a folder to unzip rather than a
 single installer file — that tradeoff is unresolved. **Deferred**: user
 doesn't need this now.
 
+### 13. Bapi visual/wording flourish — `deferred` — S — agent TBD
+Spun off from item 2's Bapi easter-egg achievement (2026-07-04): once the
+"Bapi" achievement itself is implemented, there's an open, explicitly
+deferred question about whether entering that name should also change
+something visually/textually elsewhere in the game — the user's own
+brainstorm, not yet decided. Two rough options floated during item 2's
+design pass: a subtle warm-palette tint (session-only, contained to a
+specific UI element rather than a full reskin) or a single extra personal
+line attached to the achievement's own unlock toast. User explicitly said
+they don't know what they want yet — revisit once item 2 ships and they've
+seen the achievement itself in action.
+
+### 14. "OP"/"Cheater" guaranteed-best-cards easter egg — `deferred` — size unclear — agent TBD
+Raised by the user 2026-07-04 while finalizing item 2's design: entering a
+name like "OP," "Super OP," or "Cheater" (exact wording undecided — user
+floated these as brainstorm examples, not final) would put the human player
+in a "god mode" where they're always dealt the best cards each round.
+Distinct from the Bapi achievement (item 2) — this would need real
+deal-logic changes (guaranteed best cards), not just a name-triggered
+achievement unlock, so it's a heavier lift than a cosmetic easter egg. User
+explicitly said this isn't necessary right now — logged for later rather
+than scoped in detail.
+
+### 15. Achievement toast redesign (box notification, non-fading, click-to-highlight) — `deferred` — S-M — `game-designer` → `senior-developer`
+Added 2026-07-04, after the user played the just-shipped mid-session
+achievement toast (item 2) and its three follow-up fixes (longer hold,
+click-to-dismiss, in-game Achievements button) and decided the whole
+presentation is the wrong shape, not just under-tuned. **This replaces the
+current centered-fading-banner toast entirely** — not another tuning pass.
+Concrete replacement spec, from the user's own sketch:
+- A bordered box in the **top-left corner** (not centered/top-banner).
+- **No fade-out at any point** — stays fully solid/visible until the user
+  dismisses it (the just-shipped auto-fade and click-to-dismiss behavior
+  from this session's follow-up work is superseded here).
+- **Continuously animates in a loop** (gold color, pulsing/looping) the
+  entire time it's displayed, rather than a static hold.
+- **Clicking it opens `AchievementsView` directly**, with the just-unlocked
+  achievement visually highlighted in an intuitive way (exact highlight
+  treatment — border, background tint, etc. — left to whoever designs
+  this).
+- Needs a dismiss path for a user who doesn't want to open Achievements
+  (a close control, or a distinct "click elsewhere on the box" affordance)
+  — worth a `game-designer` pass to nail exact interaction details (e.g.
+  dismiss-without-opening vs. click-always-opens-Achievements, the specific
+  loop animation) rather than assuming.
+
+The underlying FIFO-queue/`Handler.keepOnTop()` mid-game-visibility plumbing
+built for the current toast (item 2 and its follow-ups) is likely still
+reusable — this is a presentation-layer redesign, not a new architecture.
+
 ---
 
 ## Notes
@@ -378,6 +472,16 @@ doesn't need this now.
   scoping material for its already-planned `game-designer` conversation,
   and item 11 was marked `blocked` on item 1 rather than independent, since
   it depends on multiple AI difficulty tiers existing first.
+- 2026-07-04: item 2's design finalized after two independent `game-designer`
+  spec passes plus user review (see this file's item 2 writeup for the
+  locked-in storage/achievement-list/Bapi/profile-extensibility details).
+  Two new deferred items were appended without renumbering the rest of the
+  queue: item 13 (Bapi visual/wording flourish, split out of item 2's scope)
+  and item 14 (an "OP"/"Cheater" guaranteed-best-cards easter egg, a
+  separate idea the user floated during the same conversation). Item 2's
+  primary-owner column was also corrected from a frontend/backend split to
+  `senior-developer`, matching this project's stated generalist-role
+  preference in `CLAUDE.md` (this repo has no real frontend/backend seam).
 
 ## Process notes
 
