@@ -41,6 +41,7 @@ that item — this is "skip by default," not "never run."
 | 9 | In-play round/card-count HUD + hamburger menu | ready | M | `game-designer` → `senior-frontend-developer` + `senior-backend-developer` |
 | 10 | Replay/score history (persistent storage) | ready | S-M | `senior-backend-developer` + `senior-frontend-developer` |
 | 11 | Difficulty tiers: freeplay vs. journey mode | blocked — depends on item 1 | M-L, open-ended | agent TBD |
+| 12 | Distributable executable + GitHub Release | deferred | S-M | `senior-backend-developer` |
 
 All live visual sanity checks previously owed here (invalid-move feedback,
 start screen/rules/name entry) were walked by the user once back at their
@@ -282,6 +283,17 @@ distinct, ordered AI difficulty tiers to select/unlock — today there's just
 conversation scoping item 1's AI strategy work rather than scoping it
 independently; it's a UI/mode-selection layer on top of whatever tier
 structure that conversation produces, not a separable feature.
+
+### 12. Distributable executable + GitHub Release — `deferred` — S-M — `senior-backend-developer`
+Added 2026-07-04 per user request, to make the game shareable with
+non-developer players (no git/JDK required on their end). Proposed approach,
+not yet scoped in detail: use `jpackage` (bundled with JDK 21) to produce a
+self-contained Windows app-image or installer with a private Java runtime
+embedded, then attach it as a binary asset on a tagged GitHub Release. A full
+`.exe`/`.msi` installer needs the WiX Toolset as a build-time dependency; a
+plain app-image skips that but ships as a folder to unzip rather than a
+single installer file — that tradeoff is unresolved. **Deferred**: user
+doesn't need this now.
 
 ---
 
