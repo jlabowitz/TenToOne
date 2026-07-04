@@ -6,7 +6,10 @@ import java.awt.*;
  * hotspot, wired into Human.nextTrick() by the backend pass) -- identical
  * content and layout in both contexts by design, so a future in-game legend
  * (ROADMAP item 7, blocked on this item) can slot into LEGEND_TOP/BOTTOM
- * below without restructuring this view again.
+ * below without restructuring this view again. That item isn't built yet,
+ * so LEGEND_TOP/BOTTOM ships empty in this pass -- no placeholder text or
+ * border, just the reserved vertical space between the divider and the
+ * Back button.
  *
  * A full 840x630 canvas GameObject. Does NOT extend ModalOverlay -- that
  * class's panel is fixed at 640x430, too small for this page's content --
@@ -55,7 +58,7 @@ public class RulesView extends GameObject {
 
     private static final int DIVIDER_Y = 480;
 
-    /** Reserved for ROADMAP item 7 (in-game legend); ships empty in this pass -- no placeholder text/border, see class doc. */
+    /** Reserved for ROADMAP item 7 (in-game legend); see class doc for why it ships empty in this pass. */
     public static final int LEGEND_TOP = 490, LEGEND_BOTTOM = 570;
 
     private static final int BACK_TOP = 576, BACK_BOTTOM = 602;
@@ -159,8 +162,7 @@ public class RulesView extends GameObject {
         g.setColor(Color.BLACK);
         g.drawLine(CONTENT_LEFT, DIVIDER_Y, CONTENT_RIGHT, DIVIDER_Y);
 
-        //LEGEND_TOP..LEGEND_BOTTOM intentionally left blank -- see class doc
-        //and ROADMAP item 7.
+        //LEGEND_TOP..LEGEND_BOTTOM intentionally left blank -- see class doc.
 
         g.setColor(Color.BLACK);
         g.drawRect(BACK_LEFT, BACK_TOP, BACK_RIGHT - BACK_LEFT - 1, BACK_BOTTOM - BACK_TOP - 1);
