@@ -3,6 +3,18 @@
 Java card game (Swing/AWT GUI) with no build tool (no Maven/Gradle) — plain
 `javac` compilation. JUnit jars are vendored in `lib/`, not fetched.
 
+## Project stakes
+
+This is a personal/experimental project, not currently meant to ship — the user
+tests changes by hand rather than expecting a full production release process.
+Review/QA are opt-in here (skip by default; still run them for genuinely risky
+changes, e.g. state/lifecycle or data-layer changes, or whenever asked) rather
+than the default full gauntlet.
+
+It's also a single-tier desktop app with no frontend/backend seam — prefer
+delegating implementation work to the generalist `senior-developer` role rather
+than splitting it across `senior-frontend-developer`/`senior-backend-developer`.
+
 ## JDK location
 
 `javac`/`java` are not on PATH. The JDK lives at:
