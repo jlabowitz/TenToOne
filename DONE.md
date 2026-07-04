@@ -3,10 +3,10 @@
 Archive of finished `ROADMAP.md` items, moved out on 2026-07-02 to keep the
 active roadmap focused on what's next. This is historical record —
 implementation detail and rationale for work already shipped, not a task
-queue. Item numbers below are the original `ROADMAP.md` queue numbers at the
-time each shipped; they are superseded by `ROADMAP.md`'s 2026-07-02
-renumbering of the active queue, so don't cross-reference these numbers
-against current roadmap items.
+queue. Item numbers below are permanent and sequential in chronological ship
+order — not tied to `ROADMAP.md`'s queue positions, which get renumbered as
+that file's active backlog changes — so it's safe to cross-reference these
+numbers from elsewhere without them going stale.
 
 ### 1. Repo hygiene sweep — done, pushed
 Untracked stale `out/*.class`, added `.gitignore`, deleted dead
@@ -61,7 +61,7 @@ an initial 11-button row as cluttered):
   `trickScore` was, via `resetTrickScore()`) — fixed alongside the HUD work
   so a new round doesn't show last round's bet as already placed.
 
-### 1. Thread model fix (Handler race + Game.stop() self-join) — done, pushed
+### 6. Thread model fix (Handler race + Game.stop() self-join) — done, pushed
 `Handler`'s object list was a `LinkedList` walked by index while a separate
 thread concurrently added/removed objects during play — a genuine data race
 (proven by a regression test that fails on the old code) and an O(n^2)
@@ -85,7 +85,7 @@ across both self-join and external-join paths (zero hangs). New
 `TestHandler.java` (4 tests) and 2 new `TestGame.java` tests. Commit
 `fae32e5`.
 
-### 1. Trick-state indicators (leader, led suit, high card) — done, not yet pushed
+### 7. Trick-state indicators (leader, led suit, high card) — done, not yet pushed
 Three indicators, one `game-designer` spec pass covering all three since
 they render at the same place/time: a black dot marking the current trick
 leader, a "Led: [suit]" HUD line for the trick-in-progress, and a gold ring
@@ -116,7 +116,7 @@ missing a regenerated class file (`NoClassDefFoundError` on a switch-over-
 enum synthetic class), not caught by `javac` as a compile error. Resolved
 with a clean rebuild; `CLAUDE.md`'s Build section now calls this out.
 
-### 1. In-window round & game-flow UX — done, pushed
+### 8. In-window round & game-flow UX — done, pushed
 Three sub-parts, one `game-designer` spec pass covering all three since they
 render at the same points in the game loop (trick resolves → round ends →
 game ends): (a) a round-transition/score-summary modal (scrim + centered
@@ -155,7 +155,7 @@ removing them wasn't attempted opportunistically. They now duplicate what's
 on screen; flagged as a likely target once the "eliminate the terminal"
 goal is revisited, not fixed here.
 
-### 2. Invalid-move on-screen feedback — done, pushed, **user-confirmed**
+### 9. Invalid-move on-screen feedback — done, pushed, **user-confirmed**
 A branch-aware fading red→white text message (not a border flash or shake —
 both considered and rejected: a border risked the same pixel-collision class
 of bug the trick-indicators item hit, since `Hand.layoutCards()` spaces
@@ -183,7 +183,7 @@ on a clean rebuild.
 user was back at their computer — hands-on playtest confirmed both messages
 render and fade correctly, no issues found.
 
-### 3. Start screen + rules view + player name input — done, pushed, **user-confirmed (one bug found and fixed, see item 5)**
+### 10. Start screen + rules view + player name input — done, pushed, **user-confirmed (one bug found and fixed, see item 12)**
 Three parts per `game-designer`'s MVP scope call: a combined **Start Screen**
 (title, name field, Rules button, Start Game button — one screen, not two),
 a shared **Rules View** reachable both pre-launch and mid-game (via a new
@@ -230,9 +230,9 @@ focus, Rules round-trip preserving a partial name, name reaching the HUD,
 hotspot clearance, name rendering in `RoundSummaryPanel`/`GameOverBanner`),
 with one real gap found: the Rules button was only reachable during the
 between-tricks pause, not while a bet or card-play decision was pending —
-see item 5 for the fix.
+see item 12 for the fix.
 
-### 4. Play again (in-window restart) — done, pushed
+### 11. Play again (in-window restart) — done, pushed
 `game-designer` scoped the one genuine open question — does "Play Again"
 reappear at the Start Screen, or skip straight into a fresh game reusing
 the same name — and sent it back as a real product call rather than
@@ -289,7 +289,7 @@ matter for how this game is actually played. Judged not worth expanding an
 already-large, already-reviewed diff to fix a general `Round.java`
 correctness gap that predates this session entirely.
 
-### 5. Rules button not reachable during bet/card-play — done, pushed
+### 12. Rules button not reachable during bet/card-play — done, pushed
 User-reported gap, found during hands-on testing of item 3: the Rules
 hotspot only appeared during the between-tricks pause
 (`NextTrickPrompt`'s), not while betting (`BetStepper` showing) or choosing
