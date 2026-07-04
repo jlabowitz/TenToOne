@@ -28,6 +28,13 @@ public class BetStepper extends GameObject {
     private static final int BET_LEFT = 740;
     private static final int BET_RIGHT = 800;
 
+    // ROADMAP follow-up: Rules hotspot, same geometry as
+    // NextTrickPrompt's (verified clear of this screen's other elements --
+    // see that item's completion report for the pixel-region audit).
+    private static final String RULES_LABEL = "Rules";
+    private static final int RULES_TOP = 265, RULES_BOTTOM = 295;
+    private static final int RULES_LEFT = 760, RULES_RIGHT = 820;
+
     private final int maxBet;
     private int value;
 
@@ -74,6 +81,16 @@ public class BetStepper extends GameObject {
         return null;
     }
 
+    /**
+     * Half-open rect hit-test for the Rules hotspot, same convention as
+     * controlAt/NextTrickPrompt.isRulesHotspot. Kept separate from
+     * controlAt/Control since it isn't one of this class's own bet-input
+     * controls.
+     */
+    public boolean isRulesHotspot(int px, int py) {
+        return px >= RULES_LEFT && px < RULES_RIGHT && py >= RULES_TOP && py < RULES_BOTTOM;
+    }
+
     @Override
     public void tick() {
 
@@ -93,5 +110,11 @@ public class BetStepper extends GameObject {
 
         g.drawRect(BET_LEFT, TOP, BET_RIGHT - BET_LEFT - 1, BOTTOM - TOP - 1);
         g.drawString("Bet", BET_LEFT + 10, BOTTOM - 10);
+
+        g.drawRect(RULES_LEFT, RULES_TOP, RULES_RIGHT - RULES_LEFT - 1, RULES_BOTTOM - RULES_TOP - 1);
+        FontMetrics metrics = g.getFontMetrics();
+        int labelWidth = metrics.stringWidth(RULES_LABEL);
+        int labelX = RULES_LEFT + ((RULES_RIGHT - RULES_LEFT) - labelWidth) / 2;
+        g.drawString(RULES_LABEL, labelX, RULES_BOTTOM - 10);
     }
 }

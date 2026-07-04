@@ -46,6 +46,15 @@ public abstract class Player extends GameObject{
         return name;
     }
 
+    /**
+     * ROADMAP item 1 (play-again restart): lets the restarted game apply a
+     * freshly re-captured Start Screen name to the same Human instance
+     * rather than constructing a new Player.
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public Hand getHand() {
         return hand;
     }
@@ -96,6 +105,37 @@ public abstract class Player extends GameObject{
 
     public void resetTrickScore() {
         trickScore = 0;
+    }
+
+    /**
+     * ROADMAP item 1 (play-again restart): unlike trickScore (reset every
+     * round via resetTrickScore()), nothing resets the running game score
+     * today -- this is the dedicated reset for starting a genuinely new
+     * game on the same Player instance.
+     */
+    public void resetScore() {
+        score = 0;
+    }
+
+    /**
+     * ROADMAP item 1 (play-again restart): bundles every per-game reset
+     * needed before a restarted game's first round is dealt, mirroring this
+     * class's existing small-dedicated-reset-method convention
+     * (resetBet()/resetTrickScore()) -- this is the one call site that needs
+     * all of them at once, the same bundling pattern
+     * Round.initializeTrickLeader() already uses across all players for its
+     * own purpose. hand is reset to null (not just left empty) so the new
+     * game's first Round.initializeHands() builds a genuinely fresh Hand
+     * rather than relying on "empty but not null" holding across a whole new
+     * game.
+     */
+    public void resetForNewGame() {
+        resetBet();
+        resetTrickScore();
+        resetScore();
+        setTrickLeader(false);
+        setLeadingSuit(null);
+        setHand(null);
     }
 
     public boolean isTrickLeader() {

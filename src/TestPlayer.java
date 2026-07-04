@@ -126,4 +126,54 @@ public class TestPlayer {
         Rectangle bounds = Player.trickLeaderDotBounds(metrics, "Player Two", 0, 50);
         assertTrue(bounds.x >= 0);
     }
+
+    /**
+     * ROADMAP item 1 (play-again restart): nothing resets `score` today
+     * (only trickScore gets a dedicated reset, every round) -- resetScore()
+     * is the new dedicated reset for a full-game restart.
+     */
+    @Test
+    public void resetScoreClearsScoreToZero() {
+        Player player = new AI_Easy("Test");
+        player.increaseScore(42);
+        player.resetScore();
+        assertEquals(0, player.getScore());
+    }
+
+    /**
+     * ROADMAP item 1: resetForNewGame() bundles every per-game reset needed
+     * before a restarted game's first round is dealt -- bet/hasBet,
+     * trickScore, score, trickLeader, leadingSuit, and hand. hand is reset
+     * to null (not just emptied) so Round.initializeHands()'s
+     * `hand == null || hand.getNumCards() == 0` assertion builds a genuinely
+     * fresh Hand for the new game rather than relying on "empty but not
+     * null" surviving across a whole new game.
+     */
+    @Test
+    public void resetForNewGameClearsAllPerGameState() {
+        Player player = new AI_Easy("Test");
+        player.setBet(4);
+        player.wonTrick();
+        player.increaseScore(99);
+        player.setTrickLeader(true);
+        player.setLeadingSuit(Suit.HEARTS);
+        player.setHand(new Hand(100, 100, ID.AI));
+
+        player.resetForNewGame();
+
+        assertFalse(player.hasBet());
+        assertEquals(0, player.getBet());
+        assertEquals(0, player.getTrickScore());
+        assertEquals(0, player.getScore());
+        assertFalse(player.isTrickLeader());
+        assertNull(player.getLeadingSuit());
+        assertNull(player.getHand());
+    }
+
+    @Test
+    public void setNameChangesPlayerName() {
+        Player player = new AI_Easy("Old Name");
+        player.setName("New Name");
+        assertEquals("New Name", player.getName());
+    }
 }

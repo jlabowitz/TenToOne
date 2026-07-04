@@ -25,6 +25,11 @@ public class Human extends Player{
         try {
             while (true) {
                 Point click = mouseInput.awaitClick();
+                if (stepper.isRulesHotspot(click.x, click.y)) {
+                    RulesView.showBlocking(handler, mouseInput);
+                    mouseInput.clearClicks();
+                    continue;
+                }
                 BetStepper.Control control = stepper.controlAt(click.x, click.y);
                 if (control == null) {
                     continue;
@@ -65,6 +70,11 @@ public class Human extends Player{
         try {
             while (true) {
                 Point click = mouseInput.awaitClick();
+                if (feedback.isRulesHotspot(click.x, click.y)) {
+                    RulesView.showBlocking(handler, mouseInput);
+                    mouseInput.clearClicks();
+                    continue;
+                }
                 Card card = getHand().cardAt(click.x, click.y);
                 if (card == null) {
                     continue;

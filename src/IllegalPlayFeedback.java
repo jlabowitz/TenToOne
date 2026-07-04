@@ -29,6 +29,15 @@ public class IllegalPlayFeedback extends GameObject {
     private static final int FADE_TICKS = 90;
     private static final int TOTAL_TICKS = HOLD_TICKS + FADE_TICKS;
 
+    // ROADMAP follow-up: Rules hotspot, same geometry as
+    // NextTrickPrompt's/BetStepper's (verified clear of this screen's other
+    // elements, including the fade message itself -- see that item's
+    // completion report for the pixel-region audit). Drawn unconditionally
+    // in render(), regardless of whether a fade message is currently showing.
+    private static final String RULES_LABEL = "Rules";
+    private static final int RULES_TOP = 265, RULES_BOTTOM = 295;
+    private static final int RULES_LEFT = 760, RULES_RIGHT = 820;
+
     private String text = null;
     private int elapsed = TOTAL_TICKS;  // starts "already expired"
 
@@ -44,15 +53,32 @@ public class IllegalPlayFeedback extends GameObject {
 
     @Override
     public void render(Graphics g) {
-        if (text == null || elapsed >= TOTAL_TICKS) return;
-        Color color = colorAt(elapsed);
         Font defaultFont = g.getFont();
-        g.setFont(defaultFont.deriveFont(Font.BOLD));
-        g.setColor(color);
+
+        if (text != null && elapsed < TOTAL_TICKS) {
+            Color color = colorAt(elapsed);
+            g.setFont(defaultFont.deriveFont(Font.BOLD));
+            g.setColor(color);
+            FontMetrics metrics = g.getFontMetrics();
+            int x = (Game.WIDTH - metrics.stringWidth(text)) / 2;
+            g.drawString(text, x, BASELINE_Y);
+            g.setFont(defaultFont);
+        }
+
+        g.setColor(Color.BLACK);
+        g.drawRect(RULES_LEFT, RULES_TOP, RULES_RIGHT - RULES_LEFT - 1, RULES_BOTTOM - RULES_TOP - 1);
         FontMetrics metrics = g.getFontMetrics();
-        int x = (Game.WIDTH - metrics.stringWidth(text)) / 2;
-        g.drawString(text, x, BASELINE_Y);
-        g.setFont(defaultFont);
+        int labelWidth = metrics.stringWidth(RULES_LABEL);
+        int labelX = RULES_LEFT + ((RULES_RIGHT - RULES_LEFT) - labelWidth) / 2;
+        g.drawString(RULES_LABEL, labelX, RULES_BOTTOM - 10);
+    }
+
+    /**
+     * Half-open rect hit-test, same convention as
+     * NextTrickPrompt.isRulesHotspot/BetStepper.isRulesHotspot.
+     */
+    public boolean isRulesHotspot(int px, int py) {
+        return px >= RULES_LEFT && px < RULES_RIGHT && py >= RULES_TOP && py < RULES_BOTTOM;
     }
 
     /** Pulled out as a pure static function so the timing/fade math is testable without a window. */

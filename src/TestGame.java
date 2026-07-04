@@ -5,6 +5,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class TestGame {
@@ -204,6 +205,77 @@ public class TestGame {
         assertEquals("Distinctly Named", human.getName());
         assertEquals(ID.HUMAN, human.getID());
         assertEquals("Bot", game.getPlayers().get(1).getName());
+    }
+
+    /**
+     * ROADMAP item 1 (play-again restart): restartForNewGame() must reset
+     * every player's per-game state (not just some), and must re-invoke the
+     * captureHumanName seam and apply the result only to the human seat --
+     * an AI's name must be untouched. Package-private (same testability
+     * seam convention as buildWindow/captureHumanName) so this can be
+     * exercised directly without driving play()'s full click-driven loop.
+     */
+    @Test
+    public void restartForNewGameResetsAllPlayersAndReappliesHumanNameOnly() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES) {
+            @Override
+            String captureHumanName(List<String> aiNames) {
+                return "Restarted Name";
+            }
+        };
+        List<Player> players = game.getPlayers();
+        for (Player player : players) {
+            player.increaseScore(50);
+            player.setBet(2);
+            player.wonTrick();
+            player.setTrickLeader(true);
+            player.setLeadingSuit(Suit.HEARTS);
+        }
+
+        game.restartForNewGame();
+
+        for (Player player : players) {
+            assertEquals(0, player.getScore());
+            assertFalse(player.hasBet());
+            assertEquals(0, player.getBet());
+            assertEquals(0, player.getTrickScore());
+            assertFalse(player.isTrickLeader());
+            assertNull(player.getLeadingSuit());
+        }
+        Player human = players.get(0);
+        assertEquals(ID.HUMAN, human.getID());
+        assertEquals("Restarted Name", human.getName());
+        Player bot = players.get(1);
+        assertEquals(ID.AI, bot.getID());
+        assertEquals("Bot", bot.getName());
+    }
+
+    /**
+     * ROADMAP item 1: roundStartingPlayer must be re-randomized on restart
+     * (matching the constructor's own `new Random().nextInt(numPlayers())`
+     * logic exactly, not carried over from wherever it drifted to after the
+     * prior game's 10 rounds of nextPlayer() cycling) -- game-designer
+     * confirmed re-randomizing is the fairer, more legible choice. Asserts
+     * the result stays in bounds across many restarts rather than asserting
+     * a specific value, since this is intentionally randomized.
+     */
+    @Test
+    public void restartForNewGameReRandomizesRoundStartingPlayerWithinBounds() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        int numPlayers = game.getPlayers().size();
+        for (int i = 0; i < 30; i++) {
+            game.restartForNewGame();
+            int startingPlayer = game.getRoundStartingPlayer();
+            assertTrue(startingPlayer >= 0 && startingPlayer < numPlayers);
+        }
+    }
+
+    /** roundIndex must go back to 0 so a restarted game replays all 10 rounds. */
+    @Test
+    public void restartForNewGameResetsRoundIndexToZero() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        game.restartForNewGame();
+        assertEquals(0, game.getRoundIndex());
     }
 
     /** The hand persists between rounds, so every round must re-position it. */

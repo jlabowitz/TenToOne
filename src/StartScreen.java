@@ -10,9 +10,16 @@ import java.awt.*;
  *
  * Does NOT extend ModalOverlay: that class's panel geometry is fixed at
  * 640x430 for a dialog layered over existing board content, whereas this is
- * a full splash page shown before any board exists. Game.render() already
- * clears the canvas to white every frame before handler.render() runs (see
- * Game.render()), so this class doesn't paint its own background.
+ * a full splash page shown before any board exists. Paints its own opaque
+ * white background as the first step of render() (same defensive reasoning
+ * as RulesView's own background fill) rather than relying on Game.render()'s
+ * per-frame white fill underneath: that fill is only a blank canvas the
+ * first time this screen shows, before any Player exists. On a Play Again
+ * restart (Game.restartForNewGame()), this screen reappears while the same
+ * Player objects remain registered in the Handler for the whole session
+ * (deliberately never re-added/removed -- see restartForNewGame()'s class
+ * doc), so without its own fill, AI players' HUD text would render
+ * underneath and bleed through around this screen's own content.
  *
  * Implements TypingTarget so KeyInput.setTarget(this) can route keystrokes
  * from the name field directly into the (volatile) name buffer -- see
@@ -118,6 +125,9 @@ public class StartScreen extends GameObject implements TypingTarget {
     @Override
     public void render(Graphics g) {
         Font defaultFont = g.getFont();
+
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, Game.WIDTH, Game.HEIGHT);
 
         g.setFont(TITLE_FONT);
         g.setColor(Color.BLACK);

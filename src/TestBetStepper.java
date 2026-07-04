@@ -1,7 +1,9 @@
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for BetStepper hit-testing and draft-value clamping.
@@ -136,5 +138,42 @@ public class TestBetStepper {
         stepper.decrement();
         stepper.decrement();
         assertEquals(0, stepper.getValue());
+    }
+
+    // ROADMAP follow-up: Rules hotspot, mirrors NextTrickPrompt.isRulesHotspot
+    // (same geometry, same half-open-rect convention). See TestNextTrickPrompt
+    // for the original version of this contract.
+    private static final int RULES_TOP = 265;
+    private static final int RULES_BOTTOM = 295;
+    private static final int RULES_LEFT = 760;
+    private static final int RULES_RIGHT = 820;
+
+    @Test
+    public void clickInsideRulesHotspotReturnsTrue() {
+        BetStepper stepper = new BetStepper(10);
+        assertTrue(stepper.isRulesHotspot(790, 280));
+    }
+
+    @Test
+    public void rulesHotspotLeftAndTopBoundaryIsInclusive() {
+        BetStepper stepper = new BetStepper(10);
+        assertTrue(stepper.isRulesHotspot(RULES_LEFT, RULES_TOP));
+    }
+
+    @Test
+    public void rulesHotspotRightAndBottomBoundaryIsExclusive() {
+        BetStepper stepper = new BetStepper(10);
+        assertFalse(stepper.isRulesHotspot(RULES_RIGHT, 280));
+        assertFalse(stepper.isRulesHotspot(790, RULES_BOTTOM));
+        assertTrue(stepper.isRulesHotspot(RULES_RIGHT - 1, RULES_BOTTOM - 1));
+    }
+
+    @Test
+    public void clickOutsideRulesHotspotReturnsFalse() {
+        BetStepper stepper = new BetStepper(10);
+        assertFalse(stepper.isRulesHotspot(RULES_LEFT - 1, 280));
+        assertFalse(stepper.isRulesHotspot(790, RULES_TOP - 1));
+        // doesn't collide with the Bet control's own row
+        assertFalse(stepper.isRulesHotspot(770, 600));
     }
 }

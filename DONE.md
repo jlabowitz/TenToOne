@@ -116,7 +116,7 @@ missing a regenerated class file (`NoClassDefFoundError` on a switch-over-
 enum synthetic class), not caught by `javac` as a compile error. Resolved
 with a clean rebuild; `CLAUDE.md`'s Build section now calls this out.
 
-### 1. In-window round & game-flow UX — done, not yet pushed
+### 1. In-window round & game-flow UX — done, pushed
 Three sub-parts, one `game-designer` spec pass covering all three since they
 render at the same points in the game loop (trick resolves → round ends →
 game ends): (a) a round-transition/score-summary modal (scrim + centered
@@ -155,7 +155,7 @@ removing them wasn't attempted opportunistically. They now duplicate what's
 on screen; flagged as a likely target once the "eliminate the terminal"
 goal is revisited, not fixed here.
 
-### 2. Invalid-move on-screen feedback — done, not yet pushed, **not yet visually confirmed**
+### 2. Invalid-move on-screen feedback — done, pushed, **user-confirmed**
 A branch-aware fading red→white text message (not a border flash or shake —
 both considered and rejected: a border risked the same pixel-collision class
 of bug the trick-indicators item hit, since `Hand.layoutCards()` spaces
@@ -179,19 +179,11 @@ function for the fade math, both covered by new unit tests
 (`TestIllegalPlayFeedback`, `TestHumanIllegalReason`) — 73/73 tests passing
 on a clean rebuild.
 
-**Caveat, flagged explicitly rather than silently claimed as done:** this
-shipped without the live "launch and look" visual check this project
-normally relies on as its primary QA signal (per the reduced-flow default) —
-the machine's screen was locked when the implementer attempted it via a
-`Robot`-driven harness, and still locked on a follow-up attempt. Confidence
-here rests on thorough unit coverage of both pure-logic seams (message
-selection, fade timing) plus a direct read of the diff confirming it matches
-the design spec's illustrative code almost verbatim — not on having actually
-seen the message render. **Next session should do a 10-second sanity check**
-(deliberately click an off-suit card and an early trump lead, confirm both
-messages appear and fade correctly) before this is fully trusted.
+**Update:** the live check flagged as owed above was completed once the
+user was back at their computer — hands-on playtest confirmed both messages
+render and fade correctly, no issues found.
 
-### 3. Start screen + rules view + player name input — done, not yet pushed, **not yet visually confirmed**
+### 3. Start screen + rules view + player name input — done, pushed, **user-confirmed (one bug found and fixed, see item 5)**
 Three parts per `game-designer`'s MVP scope call: a combined **Start Screen**
 (title, name field, Rules button, Start Game button — one screen, not two),
 a shared **Rules View** reachable both pre-launch and mid-game (via a new
@@ -232,19 +224,88 @@ construction path can reach the real blocking `runStartScreen()` call in
 zero flakes) — separately confirmed once more from a clean rebuild in this
 session, same result.
 
-**Caveat, same shape as the invalid-move-feedback item above:** the live
-"launch and look" check — 5 planned checkpoints (start-screen keyboard focus
-timing, a Rules round-trip preserving a partial name, the name reaching the
-HUD, the mid-game Rules hotspot's pixel clearance, and the name rendering
-correctly in `RoundSummaryPanel`/`GameOverBanner`) — has not happened yet.
-The screen was locked on every attempt this session (implementer, then this
-session's own follow-up check). Confidence rests on clean compile, 113/113
-tests, and two independent code traces (review + QA), not on having seen
-any of it run. **Next session should walk all 5 checkpoints** before fully
-trusting this, in particular the two the design spec flagged as pure
-estimates rather than measurements: whether typing registers the instant
-the Start Screen appears, and whether the Rules hotspot (x=760-820,
-y=265-295) actually clears the click-to-continue text and hand rendering.
+**Update:** the 5 live checkpoints flagged as owed above were walked once
+the user was back at their computer — all confirmed working (keyboard
+focus, Rules round-trip preserving a partial name, name reaching the HUD,
+hotspot clearance, name rendering in `RoundSummaryPanel`/`GameOverBanner`),
+with one real gap found: the Rules button was only reachable during the
+between-tricks pause, not while a bet or card-play decision was pending —
+see item 5 for the fix.
+
+### 4. Play again (in-window restart) — done, pushed
+`game-designer` scoped the one genuine open question — does "Play Again"
+reappear at the Start Screen, or skip straight into a fresh game reusing
+the same name — and sent it back as a real product call rather than
+deciding it unilaterally; user chose **reappear** (lets a typo get fixed,
+or the machine handed to a different player, before committing).
+
+Restart happens **in place on the same `Game` instance**: `play()`'s round
+loop now sits inside an outer infinite loop (round loop → outcome banner →
+`awaitPlayAgain()` → `restartForNewGame()` → repeat), not a full `Game`/
+`Window`/thread reconstruction — reconstructing would spawn a second real
+`JFrame` and render thread with no teardown path for the old one.
+`renderPlayers()` stays a one-shot call (calling it again would silently
+double-add every `Player` to `Handler`'s per-frame walk — flagged
+proactively in the design spec as a real, non-obvious trap, not discovered
+the hard way). No `start()`/`stop()` thread-lifecycle calls anywhere in the
+restart path — the render thread already runs continuously across all 10
+rounds of one game; restart just extends that same continuity across games.
+
+New `Player.resetForNewGame()` (bundles `resetBet()`/`resetTrickScore()`/
+the new `resetScore()`/trick-leader/leading-suit/`hand = null` — mirrors
+this class's existing small-dedicated-reset-method convention) fixed a real
+gap: nothing today had ever reset a player's running game score between
+games, since no code path needed to before this item. `GameOverBanner`
+gained a "Play Again" hotspot (geometry verified against real
+`FontMetrics`); `showGameOverBanner()` now returns the banner instance so
+`play()` can remove it once Play Again is clicked, instead of leaving it
+permanent.
+
+Per this project's reduced-flow default, this item was judged risky enough
+(game lifecycle/restart logic) to route through `senior-code-reviewer` and
+`senior-qa-backend` rather than skip them. Review confirmed no double-add,
+no thread-lifecycle calls, human found by `ID` not seat index, hand
+correctly nulled; also caught a real bug found during self-verification
+(not a design ambiguity): `StartScreen` didn't paint its own background, so
+reappearing after a restart let stale AI HUD text bleed through behind it
+(harmless at first launch when no players exist yet, no longer true once
+players persist across a restart) — fixed with an opaque white fill,
+matching `RulesView`'s existing defensive approach. QA ran the full 133-test
+suite clean, then drove two consecutive full restart cycles with real
+`Robot` screenshots and direct state inspection — player count constant
+across restarts, bleed-through fix held both cycles, names/scores/hands
+reset correctly each time, no thread hangs.
+
+One real, pre-existing bug found during review, deliberately **not** fixed
+here — logged instead as `ROADMAP.md`'s new tracked item: `Round.
+renderTrumpCard()`/`renderPlayerHand()` never call `handler.removeObject()`,
+so each restart now leaks one trump card and one `Hand` object into
+`Handler`'s permanently-growing list (previously capped at 10 trump cards
+per process lifetime, since a process only ever played one game before this
+feature existed). No visible symptom — trump cards render at a fixed pixel
+position, so newer ones simply paint over older, invisible ones — and the
+realistic impact (hundreds of Play-Again clicks in one sitting) doesn't
+matter for how this game is actually played. Judged not worth expanding an
+already-large, already-reviewed diff to fix a general `Round.java`
+correctness gap that predates this session entirely.
+
+### 5. Rules button not reachable during bet/card-play — done, pushed
+User-reported gap, found during hands-on testing of item 3: the Rules
+hotspot only appeared during the between-tricks pause
+(`NextTrickPrompt`'s), not while betting (`BetStepper` showing) or choosing
+a card (`IllegalPlayFeedback` already on screen) — exactly the moments a
+new player is most likely to want the rules. This was actually anticipated
+and explicitly deferred in item 3's original design spec as a future
+options-menu follow-up; user's real playtest brought it forward sooner than
+expected.
+
+Both `BetStepper` and `IllegalPlayFeedback` now render the same Rules
+hotspot `NextTrickPrompt` already had, reusing its exact proven-safe
+coordinates (x=760-820, y=265-295) rather than new geometry. Small, low-risk
+extension of an already-shipped pattern — skipped `senior-code-reviewer`/QA
+per this project's reduced-flow default, live-verified via `Robot`
+screenshots instead: no collisions in either screen, opens/returns
+correctly, bet-stepper value and full hand preserved on return.
 
 ---
 

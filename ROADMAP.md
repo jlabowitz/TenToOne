@@ -30,27 +30,31 @@ that item — this is "skip by default," not "never run."
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 1 | Play again (in-window restart) | ready | S/M | `senior-frontend-developer` + `senior-backend-developer` |
-| 2 | AI & polish | blocked (comes after the above) | M, open-ended | `game-designer` → `senior-backend-developer` |
-| 3 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
-| 4 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
-| 5 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
-| 6 | In-game legend for trick-state indicator symbols | ready | S | `game-designer` → `senior-frontend-developer` |
+| 1 | AI & polish | ready — **user wants to scope this directly with `game-designer` before any implementation starts** | M, open-ended | `game-designer` → `senior-backend-developer` |
+| 2 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-backend-developer` |
+| 3 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
+| 4 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+| 5 | In-game legend for trick-state indicator symbols | ready | S | `game-designer` → `senior-frontend-developer` |
+| 6 | Trump-card/hand `Handler` leak | deferred | S | `senior-backend-developer` |
 
-**Live visual sanity checks owed (screen has been locked all session):**
-- Invalid-move feedback (`DONE.md` item 2, 2026-07-03): click an off-suit
-  card and an early trump lead, confirm both messages render/fade correctly.
-- Start screen/rules/name entry (`DONE.md` item 3, 2026-07-03): keyboard
-  focus on first keystroke, a Rules round-trip preserving a partial typed
-  name, the name reaching the HUD, the mid-game Rules hotspot's pixel
-  clearance (x=760-820, y=265-295), and the name rendering correctly in
-  `RoundSummaryPanel`/`GameOverBanner`.
+All live visual sanity checks previously owed here (invalid-move feedback,
+start screen/rules/name entry) were walked by the user once back at their
+computer 2026-07-03 — see `DONE.md` items 2-3 for confirmation and the one
+bug found (Rules button not reachable during bet/card-play, fixed same day,
+`DONE.md` item 5).
 
 Also noted, not acted on: 3 lingering `java.exe` "Ten to One" processes were
-observed running (2 from 2026-07-03, 1 from 2026-07-02 night) — almost
-certainly idle demo/verification windows sitting at whatever screen they
-ended on (the game-over banner is designed to never auto-exit). Not killed
-without checking, since one may be work in progress.
+observed running earlier in the session (2 from 2026-07-03, 1 from
+2026-07-02 night) — almost certainly idle demo/verification windows sitting
+at whatever screen they ended on. Not killed without checking with the
+user; still worth a manual check/cleanup at some point if they're no longer
+needed.
+
+**Note for whoever picks up item 1:** the user explicitly does not want the
+existing `AI_Easy`/`AI_Zombie` implementations modified — any smarter
+betting/strategy work should take the form of new AI variants alongside
+them, not edits to what's already there. `AI_Zombie` remains unused but
+intentionally kept as a future "easy" difficulty tier.
 
 ## Big picture: eliminate the terminal
 
@@ -60,31 +64,31 @@ render in the window. The two console-input points that used to block this
 (bet validation, bet entry) are already gone — see `DONE.md` items 4-5.
 Round-transition/score/winner messages, the click-to-continue cue, and the
 outcome banner shipped 2026-07-03 (`DONE.md`'s "In-window round &
-game-flow UX" entry), as did invalid-move feedback and the start screen/
-rules/name-entry item the same day (`DONE.md` items 2-3) — but the old
-`System.out.println` calls behind all of these were deliberately left in
-place (they now just duplicate on-screen content) rather than removed
-opportunistically; revisit once the rest of this list is in a good place.
-The only remaining terminal touchpoint tracked below is restarting without
-relaunching the process (item 1).
+game-flow UX" entry), as did invalid-move feedback, the start screen/
+rules/name-entry item, and play-again restart the same day (`DONE.md` items
+2-4) — but the old `System.out.println` calls behind all of these were
+deliberately left in place (they now just duplicate on-screen content)
+rather than removed opportunistically; revisit at some point as its own
+small cleanup pass. **This backlog is now fully shipped** — every item that
+motivated it (round transitions, invalid-move feedback, startup/rules/name
+entry, and restart) is done; the only loose end is that old-console-output
+cleanup, which nothing below is currently tracking as its own item.
 
 ## Queue
 
-### 1. Play again (in-window restart) — `ready` — S/M — `senior-frontend-developer` + `senior-backend-developer`
-Split out of the old end-of-game item 2026-07-02: showing the outcome and
-restarting the game are different capabilities. This one needs actual
-game-lifecycle/restart logic (re-initializing `Game`/`Round` state without
-relaunching the process), not just a rendering addition. Was blocked on the
-round/game-flow UX item landing first (needed an outcome screen to attach
-its button to) — unblocked now that it's shipped, see `DONE.md`.
+### 1. AI & polish — `ready` — M, open-ended — `game-designer` → `senior-backend-developer`
+**User wants to scope this directly with `game-designer` before any
+implementation starts** — hold here rather than delegating ahead on it.
+User has specific ideas/direction to bring to that conversation and has
+already indicated a strong preference: new AI variants alongside the
+existing ones, not modifications to `AI_Easy`/`AI_Zombie` (`AI_Zombie` is
+unused but functional — always plays first legal card — kept intentionally
+as a future "easy" difficulty tier, still do not delete it). Other
+candidates noted previously: opponent card-count display, play animations —
+unconfirmed whether these are still wanted, raise them in the scoping
+conversation rather than assuming.
 
-### 2. AI & polish — `blocked` (comes after the above) — M, open-ended — `game-designer` → `senior-backend-developer`
-`AI_Zombie` is unused but functional (always plays first legal card) — a
-natural "easy" difficulty tier if a difficulty picker lands; do not delete
-it. Candidates: smarter betting/strategy, opponent card-count display,
-play animations.
-
-### 3. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
+### 2. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-backend-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
 monitor to a secondary monitor with a different Windows display-scale
 factor causes blurry/stretched rendering. Root cause: the game renders via a
@@ -101,13 +105,13 @@ Swing's more DPI-aware repaint pipeline.
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
-### 4. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
+### 3. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
 Added 2026-07-02 per user request: "much later down the line," a full
 visual/art overhaul of the game beyond the functional UI fixes above.
-Intentionally deferred — revisit once the functional/UX backlog (items 1-2)
-is in a good place; scoping it now would be premature.
+Intentionally deferred — revisit once the functional/UX backlog (item 1) is
+in a good place; scoping it now would be premature.
 
-### 5. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
+### 4. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
 Added 2026-07-02 per user request, **explicitly planning-only — do not
 implement yet**. The current `src/` layout is flat: all production and test
 `.java` files live directly under `src/` with no subfolders, a structure the
@@ -139,7 +143,7 @@ a concrete list of what changes (build command, test invocation, CLAUDE.md,
 every file's package/import) before touching any files — not attempt the
 migration inline with unrelated work.
 
-### 6. In-game legend for trick-state indicator symbols — `ready` — S — `game-designer` → `senior-frontend-developer`
+### 5. In-game legend for trick-state indicator symbols — `ready` — S — `game-designer` → `senior-frontend-developer`
 Flagged as a gap during the trick-state indicators' design spec (2026-07-02,
 shipped — see `DONE.md`): none of the three indicators (trick-leader dot,
 led-suit HUD line, high-card ring) explain themselves to a new player on
@@ -149,6 +153,31 @@ measured-but-empty legend slot waiting for exactly this
 (`RulesView.LEGEND_TOP`/`LEGEND_BOTTOM`/`CONTENT_LEFT`/`CONTENT_RIGHT`, see
 `DONE.md`'s start-screen entry) — implementer should draw into that slot,
 not invent new bounds.
+
+### 6. Trump-card/hand `Handler` leak — `deferred` — S — `senior-backend-developer`
+Discovered during `senior-code-reviewer`'s pass on the Play-again item (this
+session): `Round.renderTrumpCard()` and `Round.renderPlayerHand()` add a
+trump `Card`/`Hand` object to the `Handler` every round, but nothing anywhere
+ever calls `handler.removeObject()` on either — a pre-existing gap in
+`Round.java`, not introduced by Play-again. Previously bounded: a process
+only ever played one game before Play-again existed, capping accumulation at
+10 trump cards + duplicate same-reference hand entries per process run.
+Play-again's `Player.resetForNewGame()` nulling the human's hand (the
+correct choice, so each new game gets a genuinely fresh deal) removed that
+incidental cap — a long session of repeated "Play Again" clicks now
+accumulates these objects with no upper bound.
+
+Practically negligible, not urgent: no visible symptom (trump cards always
+render at a fixed pixel position, so older leaked ones are simply painted
+over every frame, never seen) and only cheap objects leak (no image data —
+that's a separate process-wide static cache, not per-`Card`). Would take on
+the order of hundreds-to-thousands of restarts in a single sitting to matter
+at all.
+
+Fix, when picked up: track and remove the previous round's trump card in
+`Round.renderTrumpCard()` before adding the new one; stop unconditionally
+re-adding the same `Hand` reference to the `Handler` every round in
+`Round.renderPlayerHand()` (only add once per game, not once per round).
 
 ---
 
@@ -204,6 +233,19 @@ not invent new bounds.
   existing — it's now `ready`, and shipped with a reserved, pixel-measured
   empty slot for the legend to draw into. The "eliminate the terminal"
   backlog is now down to just the play-again item.
+- Queue renumbered again 2026-07-03 (same day), after play-again restart
+  shipped and moved to `DONE.md` — old items 2-6 became new items 1-5
+  (old #2 → new #1, ..., old #6 → new #5; old #1 removed), same pattern as
+  prior renumberings. This is the point where the entire "eliminate the
+  terminal" backlog (this file's original organizing theme) is fully
+  shipped. New item 6 (trump-card/hand `Handler` leak) was added the same
+  session, found by `senior-code-reviewer` during play-again's review pass.
+  A user-reported gap found during hands-on testing (Rules button not
+  reachable during bet/card-play) was fixed the same session as a quick
+  aside rather than tracked as its own queue item — see `DONE.md` item 5.
+  Per explicit user instruction, the queue now holds at item 1 (AI &
+  polish) rather than delegating ahead on it — user wants to scope that one
+  directly with `game-designer` themselves first.
 
 ## Process notes
 

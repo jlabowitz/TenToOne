@@ -28,6 +28,11 @@ public class Game extends Canvas implements Runnable{
     private int roundStartingPlayer;
     private final int roundBonus = 10;
 
+    //ROADMAP item 1 (play-again restart): kept so restartForNewGame() can
+    //re-invoke the Start Screen name-capture seam a second time -- this was
+    //a constructor parameter only before, never stored.
+    private final List<String> aiNames;
+
     //AI-only: the human's name is captured live via the Start Screen
     //(captureHumanName), not passed in as a list slot -- see the constructor.
     private static final List<String> names = new ArrayList<>() {{
@@ -62,6 +67,7 @@ public class Game extends Canvas implements Runnable{
 
         //handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
 
+        this.aiNames = aiNames;
         String humanName = captureHumanName(aiNames);
 
         int numPlayers = aiNames.size() + 1;
@@ -133,37 +139,105 @@ public class Game extends Canvas implements Runnable{
 
     private void play() {
         renderPlayers();
-        //for each round
-        while(roundIndex < 10) {
-            int currentPlayer = roundStartingPlayer;
-            Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
+        //ROADMAP item 1 (play-again restart): outer loop runs forever --
+        //the only way this process ever exits is the player closing the
+        //window (Window.java sets JFrame.EXIT_ON_CLOSE), same as before this
+        //change. renderPlayers() above stays a one-time call: it does
+        //handler.addObject(player) for every player, so calling it again in
+        //here would double-add the same Player instances to the Handler's
+        //CopyOnWriteArrayList, silently doubling every per-frame tick()/
+        //render() call per player.
+        while (true) {
+            //for each round
+            while (roundIndex < 10) {
+                int currentPlayer = roundStartingPlayer;
+                Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
 
-            //bet
-            round.bet(currentPlayer);
+                //bet
+                round.bet(currentPlayer);
 
-            //play round
-            round.playRound();
+                //play round
+                round.playRound();
 
-            //handler.removeAll();
+                //handler.removeAll();
 
-            //snapshot bet/tricksTaken before adjustScores() resets each
-            //player's trickScore to 0 -- see RoundResultRow's class doc
-            List<RoundResultRow> results = snapshotRoundResults(getPlayers(), roundBonus);
+                //snapshot bet/tricksTaken before adjustScores() resets each
+                //player's trickScore to 0 -- see RoundResultRow's class doc
+                List<RoundResultRow> results = snapshotRoundResults(getPlayers(), roundBonus);
 
-            //adjust scores accordingly
-            adjustScores();
-            printScores();
-            applyTotals(results, getPlayers());
+                //adjust scores accordingly
+                adjustScores();
+                printScores();
+                applyTotals(results, getPlayers());
 
-            showRoundSummary(roundIndex, results);
+                showRoundSummary(roundIndex, results);
 
-            roundStartingPlayer = nextPlayer(roundStartingPlayer);
-            this.roundIndex++;
+                roundStartingPlayer = nextPlayer(roundStartingPlayer);
+                this.roundIndex++;
+            }
+            //determine winner
+            Player winner = determineWinner();
+            System.out.println(winner.getName() + " won the game!");
+            GameOverBanner banner = showGameOverBanner(winner);
+            awaitPlayAgain(banner);
+            handler.removeObject(banner);
+            restartForNewGame();
         }
-        //determine winner
-        Player winner = determineWinner();
-        System.out.println(winner.getName() + " won the game!");
-        showGameOverBanner(winner);
+    }
+
+    /**
+     * ROADMAP item 1: blocks until the "Play Again" hotspot is clicked, same
+     * exact shape as RulesView.showBlocking's click loop. Any other click
+     * (e.g. a miss-click elsewhere on the frozen banner) is silently
+     * ignored -- matches every other hotspot's convention in this codebase,
+     * no error feedback on a miss-click.
+     */
+    private void awaitPlayAgain(GameOverBanner banner) {
+        mouseInput.clearClicks();
+        while (true) {
+            Point click = mouseInput.awaitClick();
+            if (banner.isPlayAgainHotspot(click.x, click.y)) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * ROADMAP item 1: resets every player's per-game state on the same
+     * Player instances (never re-adds them to handler -- see play()'s
+     * comment on the double-add trap), resets round bookkeeping, and sends
+     * the player back through the Start Screen (the user's explicit
+     * decision -- Play Again does not skip straight into a fresh game).
+     * Package-private and non-final, mirroring buildWindow/captureHumanName's
+     * existing testability seam, so a test can exercise this directly
+     * without driving play()'s full click-driven loop.
+     */
+    void restartForNewGame() {
+        for (Player player : getPlayers()) {
+            player.resetForNewGame();
+        }
+        roundIndex = 0;
+        //re-randomize rather than carry over wherever roundStartingPlayer
+        //drifted to after 10 rounds of nextPlayer() cycling -- matches the
+        //constructor's original logic exactly, confirmed by game-designer as
+        //the fairer, more legible choice.
+        roundStartingPlayer = new Random().nextInt(numPlayers());
+
+        String humanName = captureHumanName(aiNames);
+        getPlayers().stream()
+                .filter(player -> player.getID() == ID.HUMAN)
+                .findFirst()
+                .ifPresent(human -> human.setName(humanName));
+    }
+
+    /** Test-only accessor (package-private) -- see restartForNewGame()'s tests in TestGame. */
+    int getRoundStartingPlayer() {
+        return roundStartingPlayer;
+    }
+
+    /** Test-only accessor (package-private) -- see restartForNewGame()'s tests in TestGame. */
+    int getRoundIndex() {
+        return roundIndex;
     }
 
     public void adjustScores() {
@@ -227,11 +301,14 @@ public class Game extends Canvas implements Runnable{
     }
 
     /**
-     * Adds the end-of-game outcome banner (ROADMAP item 1c) and never
-     * removes it -- the render thread keeps drawing the final frame forever
-     * after play() returns, so this is the last thing the player sees.
+     * Adds the end-of-game outcome banner (ROADMAP item 1c). Since ROADMAP
+     * item 1's play-again restart, this is no longer forever -- the banner
+     * is removed once the player clicks Play Again (see play()'s
+     * awaitPlayAgain/removeObject/restartForNewGame sequence); the return
+     * value lets the caller pass this exact instance to awaitPlayAgain and
+     * then hand it back to handler.removeObject().
      */
-    private void showGameOverBanner(Player winner) {
+    private GameOverBanner showGameOverBanner(Player winner) {
         boolean humanWon = getPlayers().stream()
                 .filter(p -> p.getID() == ID.HUMAN)
                 .findFirst()
@@ -241,7 +318,9 @@ public class Game extends Canvas implements Runnable{
         //arbitrary reordering
         List<Player> standings = new ArrayList<>(getPlayers());
         standings.sort(Comparator.comparingInt(Player::getScore).reversed());
-        handler.addObject(new GameOverBanner(winner, humanWon, standings));
+        GameOverBanner banner = new GameOverBanner(winner, humanWon, standings);
+        handler.addObject(banner);
+        return banner;
     }
 
     public Player determineWinner() {
