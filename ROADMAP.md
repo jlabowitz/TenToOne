@@ -30,7 +30,7 @@ that item — this is "skip by default," not "never run."
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 1 | AI & polish | ready — **user wants to scope this directly with `game-designer` before any implementation starts** | M, open-ended | `game-designer` → `senior-developer` |
+| 1 | AI & polish | in progress | M, open-ended | `senior-developer` |
 | 2 | Achievement toast redesign (box notification, non-fading, click-to-highlight) | ready | S-M | `game-designer` → `senior-developer` |
 | 3 | Dev mode: jump-to-round + extensible dev settings | ready | S-M | `game-designer` → `senior-developer` |
 | 4 | Accessibility: Enter-to-submit name, Tab-focus to Start Game | ready | S | `senior-developer` |
@@ -89,59 +89,43 @@ cleanup, which nothing below is currently tracking as its own item.
 
 ## Queue
 
-### 1. AI & polish — `ready` — M, open-ended — `game-designer` → `senior-developer`
-**User wants to scope this directly with `game-designer` before any
-implementation starts** — hold here rather than delegating ahead on it.
-User has specific ideas/direction to bring to that conversation and has
-already indicated a strong preference: new AI variants alongside the
-existing ones, not modifications to `AI_Easy`/`AI_Zombie` (`AI_Zombie` is
-unused but functional — always plays first legal card — kept intentionally
-as a future "easy" difficulty tier, still do not delete it). Other
-candidates noted previously: opponent card-count display, play animations —
-unconfirmed whether these are still wanted, raise them in the scoping
-conversation rather than assuming.
+### 1. AI & polish — `in progress` — M — `senior-developer`
+Scope locked 2026-07-04 by `project-manager`, after three rounds of
+`game-designer` design work (see `design/ai-and-polish.md` — read that file in
+full, not just this summary) plus user review between each round. Final v1
+scope, following the design doc's own §10 recommendation:
+- New `GameSettings` plain config holder (code-only, no UI yet) with
+  `totalBetsCannotEqualTricks` (default `true`).
+- Betting-legality rule (`Round.isLegalBet`, "total bets can't equal number of
+  tricks") — new shared home in `Round.java` (not `Human`), a `Player.bet(...)`
+  signature change to thread the context it needs through `Round.bet()`'s
+  loop, `Human.isValidBet` retired in favor of the shared check, a new
+  `TestBetLegality.java`, the sanctioned rounding/tie-break patch to
+  `AI_Easy`/`AI_Zombie`'s bet *output* (not their strategy), and new UX
+  feedback when a human hits the forbidden value (mirroring
+  `IllegalPlayFeedback`).
+- New `AI_Medium` class (extends `AI_Easy`, overrides only `bet()`): the
+  *full* opponent-bet-aware betting mechanism (§4 — distribution-aware
+  signal, grain-of-salt trust dampener, self-evident guaranteed-win floor,
+  risk-tolerance scaling) plus the last-round betting heuristic fix (§5).
+- `AIPersonality` config record (§7), wired into `AI_Medium`'s constructor.
 
-**Additional scoping material from user suggestions (`SUGGESTIONS.md` idea
-#6, added 2026-07-03)** — raise these in the same `game-designer`
-conversation rather than treating them as separate items:
-- Opponent-bet-aware betting: let an AI's own bet be influenced by bets
-  already placed by opponents earlier in the same round (e.g. on a round of
-  4 cards, if earlier bets are 1, 2, 0, an AI leaning toward betting 2-3
-  might bet lower since so many opponents already expect to win a trick).
-- Last-round betting heuristic fix: user observed an AI bet 1 on a high
-  non-trump card in the final round, when the odds favor not betting unless
-  going first or holding trump — that specific bad-bet case should be
-  tuned/fixed.
-- Card-counting RNG-tiered AIs: a new, separate set of AIs (explicitly not
-  modifying `AI_Easy`/`AI_Zombie`) that pseudo-count high trump cards for
-  near-perfect information (e.g. tracking whether the Ace/King of trump have
-  appeared once you hold the Jack and the Queen is the visible trump card) —
-  RNG would tier how good a given AI is at this counting.
-- Named AI personalities: give each AI a name drawn from a list, each with
-  an associated distinct play style.
-- User also floated eventually making this ML-driven ("find the optimal
-  strategy") as a stretch idea — raise it in the same conversation, not
-  scoped further here.
-- **Betting-legality rule (added 2026-07-04, from `SUGGESTIONS.md`):** a
-  genuine rule gap, not covered by the original design — the total of all
-  bets placed in a round can currently equal the round's card count, but
-  real trick-taking-game rules require at least one player to miss their
-  bet, so the sum must never exactly equal the card count. Needs to become
-  a togglable setting (default **on**), implying a settings-menu surface
-  that doesn't exist yet. Affects every bettor, human and AI: needs an
-  `isLegalBet`-shaped check, and every existing AI's bet-rounding logic
-  likely needs adjustment to avoid landing on now-illegal totals (user
-  suggested rounding differently, and manually deciding a round-up/
-  round-down tie-break when the boundary bet is the AI's only sensible
-  choice) — the user is fine with this specific rounding-behavior change
-  touching `AI_Easy`/`AI_Zombie`, distinct from the standing "don't modify
-  existing AI" rule, which is about *strategy*, not compliance with a
-  corrected core rule. A smarter AI could reason about legality using real
-  hand knowledge (e.g. holding the trump Ace makes betting 0 illogical even
-  with a weak rest-of-hand) — raise that alongside the other AI-strategy
-  ideas above in the same conversation.
-- Item 10 below (difficulty tiers / journey mode) depends on whatever
-  AI-tier structure comes out of this conversation — see that item.
+**Deferred out of this pass** (see new items 21-22 below): `AI_Hard`/
+`AI_Expert` classes and all of §6's card-counting infrastructure
+(trump-indicator-rank + `onTrickComplete` engine hooks, two-axis recall
+capacity/accuracy dial, off-suit tracking extension), §4.2's Expert-tier
+per-opponent bet-trust history, and the dev-mode per-seat AI swap/
+personality-visibility hooks. Rationale (per the design doc's own §10):
+these need either genuinely new engine/state infrastructure with no
+precedent in the codebase (per-opponent intra-match stat tracking,
+trump-indicator-rank exposure, a trick-completion lifecycle hook), or are
+explicitly sequenced after item 3 (dev-mode settings surface), which
+doesn't exist yet — neither is true of the items kept in this pass.
+
+As before: never modify `AI_Easy`/`AI_Zombie`'s strategy (only the
+sanctioned rounding/legality patch to their bet output); `AI_Zombie` stays
+unused but is not to be deleted; new AI variants are new classes, not edits
+to the existing two.
 
 ### 2. Achievement toast redesign (box notification, non-fading, click-to-highlight) — `ready` — S-M — `game-designer` → `senior-developer`
 Added 2026-07-04, after the user played the achievement toast shipped in
@@ -292,6 +276,13 @@ conversation scoping item 1's AI strategy work rather than scoping it
 independently; it's a UI/mode-selection layer on top of whatever tier
 structure that conversation produces, not a separable feature.
 
+**Update 2026-07-04:** item 1's v1 pass (see above) ships a 3-tier ladder
+(`AI_Zombie`/`AI_Easy`/`AI_Medium`) rather than the full 5-tier ladder the
+original design doc scoped — `AI_Hard`/`AI_Expert` are deferred to new item
+21. This item stays `blocked`: a journey-mode unlock progression built
+against only 3 tiers would need rework once the other two land, so it's not
+worth starting this against a partial ladder.
+
 ### 11. Trump-card/hand `Handler` leak — `deferred` — S — `senior-developer`
 Discovered during `senior-code-reviewer`'s pass on the Play-again item (this
 session): `Round.renderTrumpCard()` and `Round.renderPlayerHand()` add a
@@ -432,6 +423,44 @@ a parallel project. **Explicitly deferred, not scoped further here** — same
 treatment as item 1 (AI & polish) and item 18 (`src/` restructuring): needs
 its own dedicated conversation with the user before any implementation
 starts, not something to plan or estimate speculatively in this queue entry.
+
+### 20. ML-driven AI ("find the optimal strategy") — `deferred` — XL, open-ended — agent TBD
+Split out of item 1's scoping conversation, 2026-07-04: the user's own stretch
+idea of eventually making an AI opponent ML-driven rather than heuristic/
+rule-based, floated during the `game-designer` design pass that produced
+`design/ai-and-polish.md`. That doc flags this as unscoped future work rather
+than detailing it. Confirmed by the user as out of scope for item 1's current
+pass — logged here as its own item so it isn't lost, not otherwise scoped or
+estimated.
+
+### 21. Card-counting AI tiers (`AI_Hard`/`AI_Expert`) + Expert per-opponent bet-trust history — `deferred` — L, open-ended — agent TBD
+Split out of item 1's v1 scoping pass, 2026-07-04 (see `design/ai-and-polish.md`
+§6, §4.2, §10). Deferred as the heaviest remaining piece of the AI & polish
+design: full threshold/gap card-counting (tracking cards above an AI's
+highest held trump, plus gaps between held trump cards), the two new engine
+hooks it needs (`Player.bet` exposing the trump indicator's rank, not just
+its suit; a new `Player.onTrickComplete(...)` lifecycle hook so an AI can
+observe trick-by-trick play), the two-axis `recallCapacity`/`recallAccuracy`
+tiering dial, the optional off-suit tracking extension (§6.5), and the new
+`AI_Hard`/`AI_Expert` classes themselves (their differentiating feature *is*
+card-counting, so building the classes without it isn't meaningful). Also
+bundles §4.2's Expert-tier per-opponent bet-trust history (replacing the flat
+`baseTrust` constant with a running per-opponent trend built from this
+match's results so far) — genuinely new intra-match, per-opponent state
+tracking with no precedent anywhere in this codebase today (the closest
+existing thing, `SaveData`, is cross-game persistent stats, not intra-match
+tracking). Not scoped further here — whoever picks this up should re-read
+`design/ai-and-polish.md` §6/§4.2 in full before starting.
+
+### 22. Dev-mode per-seat AI tier/personality swap + personality-visibility debug display — `deferred` — S, blocked on item 3 — agent TBD
+Split out of item 1's v1 scoping pass, 2026-07-04 (see `design/ai-and-polish.md`
+§1, §7's "dev-mode connective note"). A short-term testing aid (distinct from
+item 10's real, persistent journey-mode unlock progression): an entry in
+item 3's planned extensible dev-settings surface letting the user swap which
+AI tier/personality is seated in a game right now, for testing, plus exposing
+(for debugging only, not player-facing) which personality/tier is actually
+running under the hood per opponent seat. Explicitly sequenced after item 3
+exists, not concurrently with it.
 
 ---
 
@@ -603,4 +632,18 @@ conversation were consistently visible to and interactive with the user
 throughout the rest of the session. Before assuming screenshots can't work,
 try capturing all screens (iterate
 `GraphicsEnvironment.getScreenDevices()`), not just the default one.
+- 2026-07-04 (later still): item 1's `game-designer` scoping conversation
+  produced a full design doc, `design/ai-and-polish.md` (a new `design/`
+  folder — general protocol going forward is to write long-form design docs
+  to a file rather than paste them into chat). The user reviewed it and
+  requested a revision pass (in progress) with several changes: the
+  betting-legality rule becomes a user-facing setting (not dev-only),
+  default on; opponent-aware betting needs to support larger-than-±1 swings;
+  card-counting should track "cards above my highest trump plus gaps between
+  held trump cards" rather than a generic model; RNG-tiering gets a second
+  dial (recall capacity, not just accuracy); and `isLegalBet` needs a
+  structurally central home rather than living on `Human`. New item 20
+  (ML-driven AI) was split out and appended as its own explicitly-deferred
+  entry, since the user confirmed it's out of scope for item 1's current
+  pass but didn't want it lost.
 </content>
