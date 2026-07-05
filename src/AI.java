@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public abstract class AI extends Player{
@@ -132,5 +133,43 @@ public abstract class AI extends Player{
             return maxBet - 1;
         }
         return forbiddenBet - 1;
+    }
+
+    /**
+     * ROADMAP item 1 (design/ai-and-polish.md §4.3): counts held trump cards
+     * that form an unbroken run down from the Ace, entirely within this AI's
+     * own hand -- e.g. holding the Ace and King counts both (2), since the
+     * King can only be beaten by the Ace, and this AI already knows the Ace
+     * isn't anywhere else (only one exists, and it's right here). Holding
+     * only the King (no Ace) counts 0 -- the Ace could be elsewhere, so the
+     * King isn't unconditionally safe. Needs nothing beyond the AI's own
+     * hand -- no counting/observation of other players' cards at all.
+     *
+     * Shared here on the base AI class (not AI_Medium) rather than
+     * duplicated per-tier, since AI_Hard/AI_Expert (design doc §4.3, §6) are
+     * expected to upgrade this exact concept via real card-counting -- a
+     * strict superset of this self-evident rule (counting can only add more
+     * confirmed-safe cards, never fewer).
+     */
+    protected static int selfEvidentGuaranteedWins(Hand hand, Suit trump) {
+        List<Card> held = new ArrayList<>(hand.getCardsOfSuit(trump));
+        held.sort(Comparator.comparing(Card::getValue));
+
+        CardValue[] values = CardValue.values();
+        CardValue expectedNext = CardValue.ACE;
+        int count = 0;
+        for (int i = held.size() - 1; i >= 0; i--) {
+            CardValue value = held.get(i).getValue();
+            if (value != expectedNext) {
+                break;
+            }
+            count++;
+            int rankBelowIndex = expectedNext.ordinal() - 1;
+            if (rankBelowIndex < 0) {
+                break;
+            }
+            expectedNext = values[rankBelowIndex];
+        }
+        return count;
     }
 }

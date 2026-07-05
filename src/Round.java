@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.List;
 
 public class Round {
@@ -46,14 +47,17 @@ public class Round {
     }
 
     /**
-     * ROADMAP item 1 (design/ai-and-polish.md §3): threads the context every
-     * bettor needs to self-check Round.isLegalBet -- sumOfPriorBets
-     * accumulated as the loop goes, isLastBettor from the loop index (the
-     * player right before the round's starting player in turn order, i.e.
-     * the last player.bet() call this loop makes), and the settings toggle.
-     * numCardsThisRound isn't threaded separately: every player's hand size
-     * equals numCards for the whole round (see deal()), so each bettor
-     * already has the equivalent value via getHand().getNumCards().
+     * ROADMAP item 1 (design/ai-and-polish.md §3/§4/§5): assembles the
+     * BettingContext every bettor needs, once per player.bet() call --
+     * priorBets accumulated as the loop goes (a fresh immutable snapshot
+     * each iteration, not including the current bettor's own eventual bet),
+     * isFirstBettor/isLastBettor from the loop index (i == 0 is the round's
+     * starting player, who also leads the round's first trick; i ==
+     * numPlayers()-1 is the last player.bet() call this loop makes), and the
+     * settings toggle. numCardsThisRound isn't threaded separately: every
+     * player's hand size equals numCards for the whole round (see deal()),
+     * so each bettor already has the equivalent value via
+     * getHand().getNumCards().
      */
     public void bet(int currentPlayer, GameSettings gameSettings) {
         renderTrumpCard();
@@ -61,13 +65,16 @@ public class Round {
         for (Player player : players) {
             player.resetBet();
         }
-        int sumOfPriorBets = 0;
+        List<Integer> priorBets = new ArrayList<>();
         for (int i = 0; i < numPlayers(); i++) {
+            boolean isFirstBettor = (i == 0);
             boolean isLastBettor = (i == numPlayers() - 1);
             // choose a bet
             Player player = getPlayer(currentPlayer);
-            player.bet(trump, sumOfPriorBets, isLastBettor, gameSettings.totalBetsCannotEqualTricks);
-            sumOfPriorBets += player.getBet();
+            BettingContext context = new BettingContext(trump, List.copyOf(priorBets), numPlayers(),
+                    isFirstBettor, isLastBettor, gameSettings.totalBetsCannotEqualTricks);
+            player.bet(context);
+            priorBets.add(player.getBet());
             currentPlayer = nextPlayer(currentPlayer);
         }
     }

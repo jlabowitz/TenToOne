@@ -1,5 +1,7 @@
 import org.junit.Test;
 
+import java.util.List;
+
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -143,7 +145,7 @@ public class TestBetLegality {
 
         // last bettor, sumOfPriorBets=4 -> forbiddenBet = 5-4 = 1 = naturalBet
         // -> rounds down to 0 (forbiddenBet is neither 0 nor maxBet)
-        zombie.bet(Suit.HEARTS, 4, true, true);
+        zombie.bet(new BettingContext(Suit.HEARTS, List.of(1, 1, 1, 1), 5, false, true, true));
 
         assertEquals(0, zombie.getBet());
     }
@@ -166,7 +168,7 @@ public class TestBetLegality {
 
         // last bettor, sumOfPriorBets=9 -> forbiddenBet = 10-9 = 1 = naturalBet
         // -> rounds down to 0
-        easy.bet(Suit.HEARTS, 9, true, true);
+        easy.bet(new BettingContext(Suit.HEARTS, List.of(1, 1, 1, 1, 1, 1, 1, 1, 1), 10, false, true, true));
 
         assertEquals(0, easy.getBet());
     }

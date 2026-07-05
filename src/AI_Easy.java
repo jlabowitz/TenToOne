@@ -12,20 +12,36 @@ public class AI_Easy extends AI{
     }
 
     @Override
-    public void bet(Suit trump, int sumOfPriorBets, boolean isLastBettor, boolean totalBetsCannotEqualTricks) {
+    public void bet(BettingContext context) {
         Hand hand = getHand();
-        int numHighTrump = countTopValues(hand.getCardsOfSuit(trump), (int) (NUM_HIGH_TRUMP * numCardsFactor()));
-        int numHighCards = countTopValues(hand.getCardsNotOfSuit(trump), (int) (NUM_HIGH_CARDS * numCardsFactor()));
-
-        int naturalBet = (int) (numHighTrump * HIGH_TRUMP_PERCENT + numHighCards * HIGH_CARDS_PERCENT);
+        int naturalBet = naturalBet(context.trump());
         // ROADMAP item 1 (design/ai-and-polish.md §3): the one sanctioned
         // patch to this AI's bet output, not its strategy -- see AI.
         // roundAwayFromForbiddenBet's doc.
-        int bet = roundAwayFromForbiddenBet(naturalBet, hand.getNumCards(), sumOfPriorBets,
-                isLastBettor, totalBetsCannotEqualTricks);
+        int bet = roundAwayFromForbiddenBet(naturalBet, hand.getNumCards(), context.sumOfPriorBets(),
+                context.isLastBettor(), context.totalBetsCannotEqualTricks());
 
         setBet(bet);
         System.out.println(getName() + " bets " + bet);
+    }
+
+    /**
+     * ROADMAP item 1 (design/ai-and-polish.md §4.4 step 1): extracted
+     * verbatim from this class's former inline bet() body so AI_Medium can
+     * reuse the exact same hand-strength read as its own naturalBet, without
+     * duplicating the formula -- pure behavior-preserving relocation, no
+     * change to the computation or its output. AI_Medium also reuses this
+     * for its last-round non-trump "is this card high enough" check (design
+     * doc §5): for a 1-card hand, naturalBet(trump) on a non-trump card
+     * reduces to exactly AI_Easy's own "high card" threshold (numHighTrump
+     * is always 0 with no trump card held), so no separate threshold logic
+     * is needed there either.
+     */
+    protected int naturalBet(Suit trump) {
+        Hand hand = getHand();
+        int numHighTrump = countTopValues(hand.getCardsOfSuit(trump), (int) (NUM_HIGH_TRUMP * numCardsFactor()));
+        int numHighCards = countTopValues(hand.getCardsNotOfSuit(trump), (int) (NUM_HIGH_CARDS * numCardsFactor()));
+        return (int) (numHighTrump * HIGH_TRUMP_PERCENT + numHighCards * HIGH_CARDS_PERCENT);
     }
 
     private double numCardsFactor() {

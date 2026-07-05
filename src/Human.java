@@ -23,7 +23,10 @@ public class Human extends Player{
 
 
     @Override
-    public void bet(Suit trump, int sumOfPriorBets, boolean isLastBettor, boolean totalBetsCannotEqualTricks) {
+    public void bet(BettingContext context) {
+        int sumOfPriorBets = context.sumOfPriorBets();
+        boolean isLastBettor = context.isLastBettor();
+        boolean totalBetsCannotEqualTricks = context.totalBetsCannotEqualTricks();
         int maxBet = getHand().getNumCards();
         System.out.println(getHand());
         System.out.println(getName() + ", click the stepper to choose your bet (0-" + maxBet + "), then click Bet.");

@@ -3,6 +3,7 @@ import org.junit.Test;
 import java.awt.Canvas;
 import java.awt.Component;
 import java.awt.event.MouseEvent;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -64,7 +65,7 @@ public class TestHumanBet {
 
         // not the last bettor, so the "total bets cannot equal tricks" rule
         // never constrains this bet -- irrelevant to what this test checks
-        human.bet(Suit.HEARTS, 0, false, true);
+        human.bet(new BettingContext(Suit.HEARTS, List.of(), 2, true, false, true));
         clicker.join();
 
         assertFalse("the first click (inside the toast band) must dismiss the toast rather than being ignored",
@@ -106,7 +107,7 @@ public class TestHumanBet {
         clicker.start();
 
         // last bettor; sumOfPriorBets=1 in a 2-card round -> forbiddenBet = 2-1 = 1
-        human.bet(Suit.HEARTS, 1, true, true);
+        human.bet(new BettingContext(Suit.HEARTS, List.of(1), 2, false, true, true));
         clicker.join();
 
         assertEquals("the second Bet click (on the legal value) must be the one that finalizes",

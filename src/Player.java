@@ -82,17 +82,17 @@ public abstract class Player extends GameObject{
     }
 
     /**
-     * ROADMAP item 1 (design/ai-and-polish.md §3): mirrors playCard's
-     * existing convention of threading contextual per-call state (cardsPlayed/
-     * leading/trumpBroken there; sumOfPriorBets/isLastBettor/
-     * totalBetsCannotEqualTricks here) as plain parameters, rather than a new
-     * wrapper object, so every bettor (human or AI) can self-check its
-     * candidate bet against Round.isLegalBet. numCardsThisRound isn't a
-     * separate parameter: it always equals this player's own hand size
-     * (getHand().getNumCards()) for the whole round, already available to
-     * every implementation without threading it separately.
+     * ROADMAP item 1 (design/ai-and-polish.md §3/§4/§5): originally mirrored
+     * playCard's convention of threading contextual per-call state
+     * (sumOfPriorBets/isLastBettor/totalBetsCannotEqualTricks) as plain
+     * parameters. Widened to a single BettingContext once §4's opponent-aware
+     * signal and §5's last-round fix needed more pieces (each individual
+     * prior bet, numPlayers, isFirstBettor) than was reasonable to keep
+     * adding as primitives -- see BettingContext's own doc. numCardsThisRound
+     * still isn't part of the context: it always equals this player's own
+     * hand size (getHand().getNumCards()) for the whole round.
      */
-    public abstract void bet(Suit trump, int sumOfPriorBets, boolean isLastBettor, boolean totalBetsCannotEqualTricks);
+    public abstract void bet(BettingContext context);
 
     public int getScore() {
         return score;
