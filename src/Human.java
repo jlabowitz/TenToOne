@@ -23,13 +23,22 @@ public class Human extends Player{
 
 
     @Override
-    public void bet(Suit trump) {
+    public void bet(Suit trump, int sumOfPriorBets, boolean isLastBettor, boolean totalBetsCannotEqualTricks) {
         int maxBet = getHand().getNumCards();
         System.out.println(getHand());
         System.out.println(getName() + ", click the stepper to choose your bet (0-" + maxBet + "), then click Bet.");
 
         BetStepper stepper = new BetStepper(maxBet);
         handler.addObject(stepper);
+        // ROADMAP item 1 (design/ai-and-polish.md §3's flagged UX gap):
+        // BetStepper already clamps to [0, maxBet], so the range-check branch
+        // of Round.isLegalBet is unreachable from this UI -- but the forbidden
+        // "total bets can't equal tricks" value is an *interior* value the
+        // stepper can absolutely still produce, so a click on it must not
+        // silently no-op. Mirrors playCard()'s IllegalPlayFeedback usage
+        // exactly (add-before/remove-after, same trigger()/render() pattern).
+        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
+        handler.addObject(feedback);
         mouseInput.clearClicks();
         try {
             while (true) {
@@ -60,20 +69,36 @@ public class Human extends Player{
                         stepper.increment();
                         continue;
                     case BET:
-                        if (isValidBet(stepper.getValue(), maxBet)) {
-                            setBet(stepper.getValue());
+                        int candidate = stepper.getValue();
+                        if (Round.isLegalBet(candidate, maxBet, sumOfPriorBets, maxBet,
+                                isLastBettor, totalBetsCannotEqualTricks)) {
+                            setBet(candidate);
                             return;
                         }
+                        int forbiddenBet = maxBet - sumOfPriorBets;
+                        feedback.trigger(illegalBetReason(forbiddenBet));
+                        System.out.println(illegalBetReason(forbiddenBet));
                         continue;
                 }
             }
         } finally {
+            handler.removeObject(feedback);
             handler.removeObject(stepper);
         }
     }
 
-    static boolean isValidBet(int bet, int maxBet) {
-        return bet >= 0 && bet <= maxBet;
+    /**
+     * Message shown via IllegalPlayFeedback when this human, as the round's
+     * last bettor, clicks Bet on the one forbidden value (Round.isLegalBet's
+     * "total bets cannot equal tricks" rule) -- pure static string builder,
+     * mirroring illegalReason's shape below. Only ever reachable from
+     * Human.bet()'s BET case, where isLegalBet having failed with a
+     * stepper-clamped in-range candidate means this exact rule is why (see
+     * bet()'s comment on BetStepper already ruling out the plain range
+     * check).
+     */
+    static String illegalBetReason(int forbiddenBet) {
+        return "Total bets can't equal " + forbiddenBet + " -- pick a different value.";
     }
 
     @Override

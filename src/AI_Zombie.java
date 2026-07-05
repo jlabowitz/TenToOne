@@ -7,8 +7,13 @@ public class AI_Zombie extends AI {
     }
 
     @Override
-    public void bet(Suit trump) {
-        int bet = getHand().getNumCards()/5;
+    public void bet(Suit trump, int sumOfPriorBets, boolean isLastBettor, boolean totalBetsCannotEqualTricks) {
+        int maxBet = getHand().getNumCards();
+        int naturalBet = maxBet / 5;
+        // ROADMAP item 1 (design/ai-and-polish.md §3): the one sanctioned
+        // patch to this AI's bet output, not its strategy -- see AI.
+        // roundAwayFromForbiddenBet's doc.
+        int bet = roundAwayFromForbiddenBet(naturalBet, maxBet, sumOfPriorBets, isLastBettor, totalBetsCannotEqualTricks);
         setBet(bet);
         System.out.println(getName() + " bets " + bet);
     }

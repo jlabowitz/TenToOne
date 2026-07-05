@@ -40,6 +40,13 @@ public class Game extends Canvas implements Runnable{
     private final SaveStore saveStore;
     private final SaveData saveData;
 
+    //ROADMAP item 1 (design/ai-and-polish.md §3): plain code-only config
+    //holder, no UI reads/writes it yet -- see GameSettings' own class doc.
+    //Held here (long-lived for the whole session, like saveData/
+    //achievementToast) rather than constructed per-round, and passed into
+    //each round's bet() call.
+    private final GameSettings gameSettings = new GameSettings();
+
     //ROADMAP item 2: long-lived for the whole session (registered with the
     //Handler once in the constructor via keepOnTop(), never removed --
     //mirrors how `players` stay registered across Play-Again per
@@ -223,7 +230,7 @@ public class Game extends Canvas implements Runnable{
                 Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
 
                 //bet
-                round.bet(currentPlayer);
+                round.bet(currentPlayer, gameSettings);
 
                 //play round
                 round.playRound();

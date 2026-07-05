@@ -4,60 +4,19 @@ import java.awt.Canvas;
 import java.awt.Component;
 import java.awt.event.MouseEvent;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Tests for Human.isValidBet, the pure validation predicate backing
- * Human.bet's console input loop.
- *
- * A bet is valid iff it is within [0, maxBet] -- you can't bet negative
- * tricks, and you can't bet more tricks than cards in your hand (maxBet is
- * the hand size for the round).
+ * Tests for Human.bet()'s click-loop wiring. The pure bet-legality predicate
+ * this loop checks (formerly Human.isValidBet, a range-only check) has been
+ * retired in favor of the shared Round.isLegalBet -- see TestBetLegality.java
+ * for that coverage (including the range-check cases migrated from here).
+ * This file keeps only the tests that exercise Human.bet()'s click-handling
+ * behavior itself, not the legality predicate in isolation.
  */
 public class TestHumanBet {
-
-    @Test
-    public void zeroIsValid() {
-        assertTrue(Human.isValidBet(0, 10));
-    }
-
-    @Test
-    public void middleValueIsValid() {
-        assertTrue(Human.isValidBet(5, 10));
-    }
-
-    @Test
-    public void exactlyMaxBetIsValid() {
-        assertTrue(Human.isValidBet(10, 10));
-    }
-
-    @Test
-    public void negativeBetIsInvalid() {
-        assertFalse(Human.isValidBet(-1, 10));
-    }
-
-    @Test
-    public void betGreaterThanMaxIsInvalid() {
-        assertFalse(Human.isValidBet(11, 10));
-    }
-
-    @Test
-    public void oneLessThanMaxBetIsValid() {
-        assertTrue(Human.isValidBet(9, 10));
-    }
-
-    @Test
-    public void oneMoreThanMaxBetIsInvalid() {
-        assertFalse(Human.isValidBet(11, 10));
-    }
-
-    @Test
-    public void zeroMaxBetOnlyZeroIsValid() {
-        assertTrue(Human.isValidBet(0, 0));
-        assertFalse(Human.isValidBet(1, 0));
-        assertFalse(Human.isValidBet(-1, 0));
-    }
 
     /**
      * Coverage gap noted in QA's follow-up on the achievement-toast
@@ -103,11 +62,55 @@ public class TestHumanBet {
         });
         clicker.start();
 
-        human.bet(Suit.HEARTS);
+        // not the last bettor, so the "total bets cannot equal tricks" rule
+        // never constrains this bet -- irrelevant to what this test checks
+        human.bet(Suit.HEARTS, 0, false, true);
         clicker.join();
 
         assertFalse("the first click (inside the toast band) must dismiss the toast rather than being ignored",
                 toast.isShowingSomething());
+    }
+
+    /**
+     * ROADMAP item 1 (design/ai-and-polish.md §3's flagged UX gap): BetStepper
+     * clamps to [0, maxBet], so the forbidden "total bets cannot equal
+     * tricks" value is the only way a human's Bet click can be illegal
+     * today. Clicking Bet on that value must not finalize the bet (the loop
+     * must keep running) -- a subsequent click on a legal value must still
+     * succeed afterward.
+     */
+    @Test(timeout = 5000)
+    public void lastBettorCannotFinalizeTheForbiddenBetValue() throws InterruptedException {
+        Handler handler = new Handler();
+        MouseInput mouseInput = new MouseInput();
+        AchievementToast toast = new AchievementToast();
+
+        Human human = new Human("Test", mouseInput, handler, toast, SaveData.defaults());
+        Hand hand = new Hand(840, 480, ID.HUMAN);
+        hand.addCard(new Card(Suit.HEARTS, CardValue.ACE));
+        hand.addCard(new Card(Suit.HEARTS, CardValue.KING));
+        human.setHand(hand); // maxBet = 2
+
+        Thread clicker = new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            deliverClick(mouseInput, 715, 600); // INCREMENT -> stepper value 1 (the forbidden value here)
+            deliverClick(mouseInput, 760, 600); // BET on the forbidden value -- must not finalize
+            deliverClick(mouseInput, 715, 600); // INCREMENT -> stepper value 2 (legal)
+            deliverClick(mouseInput, 760, 600); // BET on the now-legal value
+        });
+        clicker.start();
+
+        // last bettor; sumOfPriorBets=1 in a 2-card round -> forbiddenBet = 2-1 = 1
+        human.bet(Suit.HEARTS, 1, true, true);
+        clicker.join();
+
+        assertEquals("the second Bet click (on the legal value) must be the one that finalizes",
+                2, human.getBet());
     }
 
     /** Synthesizes a left-click MouseEvent and delivers it straight to mouseInput's listener, same as an AWT click would. */

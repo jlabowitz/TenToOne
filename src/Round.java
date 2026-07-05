@@ -45,15 +45,29 @@ public class Round {
         getPlayer(currentPlayer).setTrickLeader(true);
     }
 
-    public void bet(int currentPlayer) {
+    /**
+     * ROADMAP item 1 (design/ai-and-polish.md §3): threads the context every
+     * bettor needs to self-check Round.isLegalBet -- sumOfPriorBets
+     * accumulated as the loop goes, isLastBettor from the loop index (the
+     * player right before the round's starting player in turn order, i.e.
+     * the last player.bet() call this loop makes), and the settings toggle.
+     * numCardsThisRound isn't threaded separately: every player's hand size
+     * equals numCards for the whole round (see deal()), so each bettor
+     * already has the equivalent value via getHand().getNumCards().
+     */
+    public void bet(int currentPlayer, GameSettings gameSettings) {
         renderTrumpCard();
         renderPlayerHand();
         for (Player player : players) {
             player.resetBet();
         }
+        int sumOfPriorBets = 0;
         for (int i = 0; i < numPlayers(); i++) {
+            boolean isLastBettor = (i == numPlayers() - 1);
             // choose a bet
-            getPlayer(currentPlayer).bet(trump);
+            Player player = getPlayer(currentPlayer);
+            player.bet(trump, sumOfPriorBets, isLastBettor, gameSettings.totalBetsCannotEqualTricks);
+            sumOfPriorBets += player.getBet();
             currentPlayer = nextPlayer(currentPlayer);
         }
     }
@@ -152,6 +166,35 @@ public class Round {
             }
         }
         return winner;
+    }
+
+    /**
+     * ROADMAP item 1 (design/ai-and-polish.md §3): "total bets cannot equal
+     * number of tricks" -- the shared bet-legality rule every bettor (human
+     * or AI) must satisfy, not just Human's own range check (subsumed here
+     * as the bet<0/bet>maxBet branch below). Lives on Round (not Human)
+     * since Round already owns numCards and orchestrates the betting loop --
+     * a rule shared by every bettor shouldn't be namespaced under a
+     * Human-specific method.
+     *
+     * Only the round's *last* bettor is constrained: everyone before them
+     * bets without knowing the eventual total, so only the last bettor could
+     * ever make the total land exactly on numCardsThisRound. forbiddenBet
+     * falling outside [0, maxBet] is a natural no-op (every remaining legal
+     * bet stays legal) -- no special-casing needed, since a bet that already
+     * failed the range check can never equal an out-of-range forbiddenBet.
+     */
+    static boolean isLegalBet(int bet, int maxBet, int sumOfPriorBets,
+                               int numCardsThisRound, boolean isLastBettor,
+                               boolean totalBetsCannotEqualTricks) {
+        if (bet < 0 || bet > maxBet) {
+            return false;
+        }
+        if (!totalBetsCannotEqualTricks || !isLastBettor) {
+            return true;
+        }
+        int forbiddenBet = numCardsThisRound - sumOfPriorBets;
+        return bet != forbiddenBet;
     }
 
     /// Returns true if CARD is higher values than WINNINGCARD

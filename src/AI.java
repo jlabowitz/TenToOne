@@ -92,4 +92,45 @@ public abstract class AI extends Player{
         }
         return total;
     }
+
+    /**
+     * ROADMAP item 1 (design/ai-and-polish.md §3): the one sanctioned patch
+     * to AI_Easy/AI_Zombie's bet *output* -- a rounding/tie-break fix so
+     * neither AI ever lands on the forbidden bet value, without changing
+     * either's hand-strength *strategy* that produced naturalBet. Shared here
+     * (rather than duplicated in each subclass) since the rule is identical
+     * for both, per design doc §3:
+     *
+     * <ol>
+     *   <li>If this AI isn't the last bettor, the setting is off, or
+     *       naturalBet doesn't hit the forbidden value, naturalBet is
+     *       returned unchanged.</li>
+     *   <li>Otherwise: bump up to 1 if the forbidden value is 0 (can't round
+     *       down); bump down to maxBet-1 if it's maxBet (can't round up);
+     *       otherwise round down to forbiddenBet-1 (the conservative
+     *       default -- an Easy/Zombie-tier AI shouldn't be reasoning about
+     *       which direction is better, that's what distinguishes higher
+     *       tiers).</li>
+     * </ol>
+     */
+    protected static int roundAwayFromForbiddenBet(int naturalBet, int maxBet, int sumOfPriorBets,
+                                                     boolean isLastBettor, boolean totalBetsCannotEqualTricks) {
+        if (!totalBetsCannotEqualTricks || !isLastBettor) {
+            return naturalBet;
+        }
+        // numCardsThisRound == maxBet here: every player's hand size equals
+        // the round's card count (see Round.deal()), so this AI's own maxBet
+        // already is the value Round.isLegalBet would call numCardsThisRound.
+        int forbiddenBet = maxBet - sumOfPriorBets;
+        if (naturalBet != forbiddenBet) {
+            return naturalBet;
+        }
+        if (forbiddenBet == 0) {
+            return 1;
+        }
+        if (forbiddenBet == maxBet) {
+            return maxBet - 1;
+        }
+        return forbiddenBet - 1;
+    }
 }

@@ -12,12 +12,17 @@ public class AI_Easy extends AI{
     }
 
     @Override
-    public void bet(Suit trump) {
+    public void bet(Suit trump, int sumOfPriorBets, boolean isLastBettor, boolean totalBetsCannotEqualTricks) {
         Hand hand = getHand();
         int numHighTrump = countTopValues(hand.getCardsOfSuit(trump), (int) (NUM_HIGH_TRUMP * numCardsFactor()));
         int numHighCards = countTopValues(hand.getCardsNotOfSuit(trump), (int) (NUM_HIGH_CARDS * numCardsFactor()));
 
-        int bet = (int) (numHighTrump * HIGH_TRUMP_PERCENT + numHighCards * HIGH_CARDS_PERCENT);
+        int naturalBet = (int) (numHighTrump * HIGH_TRUMP_PERCENT + numHighCards * HIGH_CARDS_PERCENT);
+        // ROADMAP item 1 (design/ai-and-polish.md §3): the one sanctioned
+        // patch to this AI's bet output, not its strategy -- see AI.
+        // roundAwayFromForbiddenBet's doc.
+        int bet = roundAwayFromForbiddenBet(naturalBet, hand.getNumCards(), sumOfPriorBets,
+                isLastBettor, totalBetsCannotEqualTricks);
 
         setBet(bet);
         System.out.println(getName() + " bets " + bet);

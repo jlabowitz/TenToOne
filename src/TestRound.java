@@ -39,7 +39,7 @@ public class TestRound {
         players.add(new AI_Zombie("B"));
         Round round = new Round(1, players, 0, Game.WIDTH, Game.HEIGHT, new Handler());
 
-        round.bet(0);
+        round.bet(0, new GameSettings());
         round.playRound();
 
         Player winner = players.get(0).getTrickScore() == 1 ? players.get(0) : players.get(1);
@@ -62,7 +62,7 @@ public class TestRound {
         players.add(new AI_Zombie("B"));
         Round round = new Round(1, players, 0, Game.WIDTH, Game.HEIGHT, new Handler());
 
-        round.bet(0);
+        round.bet(0, new GameSettings());
         round.playRound();
 
         for (Player player : players) {
