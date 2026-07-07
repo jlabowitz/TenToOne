@@ -69,6 +69,23 @@ public class TestGame {
         }
 
         /**
+         * design/persistent-game-state.md Phase 6/7: same rationale as
+         * buildSaveStore() above -- points every test-constructed Game at a
+         * fresh temp file instead of the real {@code ~/.tentoone} game-state
+         * save, so checkpoint saves fired during a test (and the
+         * game-completion/restart clear() calls) never touch the real file.
+         */
+        @Override
+        GameStateStore buildGameStateStore() {
+            try {
+                Path dir = Files.createTempDirectory("tentoone-test-gamestate");
+                return new GameStateStore(dir.resolve("gamestate.json"));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        /**
          * Skips the real Start Screen's blocking click-loop -- nothing in a
          * test ever delivers a click, so without this override every test
          * that constructs a HeadlessGame would hang forever at construction
@@ -79,6 +96,44 @@ public class TestGame {
         @Override
         String captureHumanName(List<String> aiNames) {
             return "You";
+        }
+    }
+
+    /**
+     * design/persistent-game-state.md Phase 8: same buildWindow() override
+     * as HeadlessGame above (skip popping a real on-screen JFrame), but
+     * routed through the new snapshot-reconstruction constructor instead of
+     * the normal one -- there's no Start Screen/captureHumanName seam to
+     * override here since that whole flow is skipped by construction.
+     */
+    private static class HeadlessGameFromSnapshot extends Game {
+        HeadlessGameFromSnapshot(GameStateSnapshot snapshot) throws GameStateReconstructionException {
+            super(snapshot);
+        }
+
+        @Override
+        void buildWindow() {
+            Window.buildFrame(WIDTH, HEIGHT, "Ten to One", this);
+        }
+
+        @Override
+        SaveStore buildSaveStore() {
+            try {
+                Path dir = Files.createTempDirectory("tentoone-test-fromsnapshot");
+                return new SaveStore(dir.resolve("save.properties"));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        GameStateStore buildGameStateStore() {
+            try {
+                Path dir = Files.createTempDirectory("tentoone-test-gamestate-fromsnapshot");
+                return new GameStateStore(dir.resolve("gamestate.json"));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 
@@ -339,6 +394,24 @@ public class TestGame {
         assertEquals(0, game.getRoundIndex());
     }
 
+    /**
+     * design/persistent-game-state.md Phase 8: restartForNewGame() must clear
+     * any resumable saved game -- a completed/restarted game shouldn't offer
+     * resume. saveGameStateCheckpoint() is exercised directly (package-private
+     * seam, mirroring this file's other direct-method-call testability
+     * convention) rather than driving a full click-scripted round.
+     */
+    @Test
+    public void restartForNewGameClearsAnyResumableGameStateSave() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        game.saveGameStateCheckpoint();
+        assertTrue("a checkpoint save must make hasResumableGame() true", game.hasResumableGame());
+
+        game.restartForNewGame();
+
+        assertFalse("restartForNewGame() must clear the resumable save", game.hasResumableGame());
+    }
+
     /** The hand persists between rounds, so every round must re-position it. */
     @Test
     public void redealtHumanHandIsRepositionedEachRound() {
@@ -410,6 +483,79 @@ public class TestGame {
 
         assertFalse("the first click (inside the toast band) must dismiss the toast rather than being ignored",
                 toast.isShowingSomething());
+    }
+
+    /**
+     * design/persistent-game-state.md Phase 8: reconstructs a live Game
+     * directly from a GameStateSnapshot (no Start Screen, no normal
+     * constructor path) and asserts its round/player/hand state matches the
+     * snapshot -- including that the human's hand ends up positioned at the
+     * player's actual on-screen position (Game.renderPlayers'
+     * (WIDTH, HEIGHT - 150)), not left at whatever position the Round
+     * reconstruction constructor saw before renderPlayers() had run (see
+     * Round.repositionHumanHand()'s doc for why that ordering matters).
+     */
+    @Test
+    public void constructsFromSnapshotWithPlayersAndRoundState() throws GameStateReconstructionException {
+        GameStateSnapshot snapshot = new GameStateSnapshot();
+        snapshot.roundIndex = 3;
+        snapshot.roundStartingPlayer = 1;
+        snapshot.roundsHitBonusThisGame = 2;
+        snapshot.wasSoleLastAtHalfway = true;
+
+        PlayerSnapshot human = new PlayerSnapshot();
+        human.name = "Resumed Player";
+        human.archetypeId = "human";
+        human.score = 30;
+        human.bet = 2;
+        human.hasBet = true;
+        human.trickScore = 1;
+        human.hand.add(new CardSnapshot(Suit.HEARTS, CardValue.ACE));
+        human.hand.add(new CardSnapshot(Suit.SPADES, CardValue.TWO));
+        snapshot.players.add(human);
+
+        PlayerSnapshot ai = new PlayerSnapshot();
+        ai.name = "Bot";
+        ai.archetypeId = "ai_easy";
+        ai.score = 12;
+        ai.bet = 1;
+        ai.hasBet = true;
+        ai.trickScore = 0;
+        ai.hand.add(new CardSnapshot(Suit.CLUBS, CardValue.KING));
+        ai.hand.add(new CardSnapshot(Suit.DIAMONDS, CardValue.THREE));
+        snapshot.players.add(ai);
+
+        RoundSnapshot round = new RoundSnapshot();
+        round.trumpCard = new CardSnapshot(Suit.HEARTS, CardValue.QUEEN);
+        round.trumpBroken = false;
+        round.currentPlayer = 0;
+        snapshot.round = round;
+
+        HeadlessGameFromSnapshot game = new HeadlessGameFromSnapshot(snapshot);
+
+        assertEquals(3, game.getRoundIndex());
+        assertEquals(1, game.getRoundStartingPlayer());
+        assertEquals(2, game.getPlayers().size());
+
+        Player rebuiltHuman = game.getPlayers().get(0);
+        assertEquals("Resumed Player", rebuiltHuman.getName());
+        assertEquals(ID.HUMAN, rebuiltHuman.getID());
+        assertEquals(30, rebuiltHuman.getScore());
+        assertTrue(rebuiltHuman.hasBet());
+        assertEquals(2, rebuiltHuman.getBet());
+
+        Player rebuiltAi = game.getPlayers().get(1);
+        assertEquals("Bot", rebuiltAi.getName());
+        assertEquals(2, rebuiltAi.getHand().getNumCards());
+
+        Round liveRound = game.getCurrentRound();
+        assertTrue(liveRound != null);
+        assertEquals(Suit.HEARTS, liveRound.getTrump());
+        assertFalse(liveRound.getTrumpBroken());
+        assertNull(liveRound.getCurrentTrick());
+
+        assertEquals(Game.WIDTH, rebuiltHuman.getHand().getX());
+        assertEquals(Game.HEIGHT - 150, rebuiltHuman.getHand().getY());
     }
 
     /** Synthesizes a left-click MouseEvent and delivers it straight to mouseInput's listener, same as an AWT click would. */

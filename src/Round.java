@@ -9,6 +9,13 @@ public class Round {
     private final Suit trump;
     private final Deck deck;
     private boolean trumpBroken;
+    /**
+     * design/persistent-game-state.md Phase 4: promoted from playRound()'s
+     * local variable so a checkpoint fired while a player is blocked mid-trick
+     * can read the trick currently in progress. Set at the top of each loop
+     * iteration, cleared once that trick resolves -- null between tricks.
+     */
+    private Trick currentTrick;
 
     private final int WIDTH, HEIGHT;
     private final Handler handler;
@@ -37,6 +44,98 @@ public class Round {
         //trick. currentPlayer/roundStartingPlayer is already the right
         //value to seed this with, so no separate lookup is needed.
         initializeTrickLeader();
+    }
+
+    /**
+     * design/persistent-game-state.md Phase 5: reconstruction constructor --
+     * accepts already-built state (trump card/suit, trumpBroken, and each
+     * player already carrying its restored hand/bet/trickScore) instead of
+     * dealing fresh and drawing a trump card from a new Deck -- the normal
+     * constructor's deck/deal()/trump-draw are all skipped here, matching
+     * design doc §1's "the undealt deck is dead once a round starts" (nothing
+     * downstream of this constructor ever reads `deck`, so it's left null).
+     *
+     * `currentPlayer` is the seat leading the round's current (if mid-trick)
+     * or next (if between tricks) trick -- this is Round's own currentPlayer
+     * field's existing double duty (see playRound()'s doc), not a new
+     * concept. A deliberate addition beyond design doc §2's literal
+     * RoundSnapshot listing (that section doesn't call this field out
+     * explicitly) -- see GameStateCodec's class doc for why it's needed:
+     * without it, a round resumed between tricks has no way to know which
+     * seat leads the next one.
+     *
+     * Callers reconstructing a round that's mid-trick must also call
+     * setCurrentTrick(...) right after construction, once the corresponding
+     * Trick has been built (see Trick's own reconstruction constructor);
+     * between-tricks callers leave currentTrick null (this constructor's
+     * default). Renders the trump card/player hand on screen the same way
+     * the normal constructor's bet() call eventually would -- reconstruction
+     * skips bet() entirely (betting already happened), so this constructor
+     * does that rendering itself via renderTrumpCard()/renderPlayerHand().
+     */
+    public Round(int numCards, List<Player> players, int currentPlayer, int width, int height, Handler handler,
+                 Card trumpCard, Suit trump, boolean trumpBroken) {
+        this.numCards = numCards;
+        this.players = players;
+        this.currentPlayer = currentPlayer;
+        WIDTH = width;
+        HEIGHT = height;
+        this.handler = handler;
+        this.deck = null;
+        this.trumpCard = trumpCard;
+        this.trump = trump;
+        this.trumpBroken = trumpBroken;
+
+        positionHumanHand();
+        renderTrumpCard();
+        renderPlayerHand();
+        initializeTrickLeader();
+    }
+
+    /**
+     * design/persistent-game-state.md Phase 8: re-positions the human's hand
+     * using the player's *current* on-screen x/y -- needed when a Round is
+     * reconstructed from a snapshot before Game.renderPlayers() has actually
+     * positioned the player objects (GameStateCodec.fromSnapshot builds
+     * players and this Round together in one call, but Game's snapshot
+     * constructor only calls renderPlayers() afterward, once it has the
+     * reconstructed player list in hand). A no-op if there's no human
+     * player. Public since the caller here is Game, not this class itself.
+     */
+    public void repositionHumanHand() {
+        positionHumanHand();
+    }
+
+    /**
+     * design/persistent-game-state.md Phase 5: sets the trick currently in
+     * progress on a reconstructed Round -- see the reconstruction
+     * constructor's doc. Package-private: only GameStateCodec (reconstruction)
+     * calls this; the normal playRound() loop manages currentTrick itself.
+     */
+    void setCurrentTrick(Trick currentTrick) {
+        this.currentTrick = currentTrick;
+    }
+
+    /** design/persistent-game-state.md Phase 4: the trick currently in progress, or null between tricks. */
+    public Trick getCurrentTrick() {
+        return currentTrick;
+    }
+
+    public Card getTrumpCard() {
+        return trumpCard;
+    }
+
+    public Suit getTrump() {
+        return trump;
+    }
+
+    public boolean getTrumpBroken() {
+        return trumpBroken;
+    }
+
+    /** The seat leading the round's current (mid-trick) or next (between tricks) trick -- see the reconstruction constructor's doc. */
+    public int getCurrentPlayer() {
+        return currentPlayer;
     }
 
     private void initializeTrickLeader() {
@@ -86,11 +185,12 @@ public class Round {
             //for each player
             int trickStartPlayer = currentPlayer;
 
-            Trick trick = new Trick(players, currentPlayer, trump, trumpBroken, WIDTH, HEIGHT, handler);
-            List<Card> cardsPlayed = trick.play();
+            currentTrick = new Trick(players, currentPlayer, trump, trumpBroken, WIDTH, HEIGHT, handler);
+            List<Card> cardsPlayed = currentTrick.play();
             if (!trumpBroken) {
-                trumpBroken = trick.getTrumpBroken();
+                trumpBroken = currentTrick.getTrumpBroken();
             }
+            currentTrick = null;
 
             //determine winner of trick
             int winnerIndex = determineTrickWinner(cardsPlayed, trump);
@@ -136,13 +236,24 @@ public class Round {
             if (player.getHand() == null) {
                 player.setHand(new Hand(WIDTH, HEIGHT, player.getID()));
             }
+        }
+        positionHumanHand();
+    }
+
+    /**
+     * Position the human's hand here, on the game-logic thread, so cardAt
+     * hit-tests the on-screen position before any click is awaited.
+     * Game.renderPlayers has already placed the human player at
+     * (WIDTH, HEIGHT - 150) on this thread; Player.render's hand.setY(getY())
+     * on the render thread then re-writes the same value, which is benign.
+     * Factored out of initializeHands() (design/persistent-game-state.md
+     * Phase 5) so the reconstruction constructor -- which skips deal()/
+     * initializeHands() entirely, since hands are already built and restored
+     * by the caller -- can still position the human's hand correctly.
+     */
+    private void positionHumanHand() {
+        for (Player player : players) {
             if (player.getID() == ID.HUMAN) {
-                //Position the hand here, on the game-logic thread, so cardAt
-                //hit-tests the on-screen position before any click is awaited.
-                //Game.renderPlayers has already placed the human player at
-                //(WIDTH, HEIGHT - 150) on this thread; Player.render's
-                //hand.setY(getY()) on the render thread then re-writes the
-                //same value, which is benign.
                 Hand hand = player.getHand();
                 hand.setX(player.getX());
                 hand.setY(player.getY());

@@ -94,6 +94,18 @@ public abstract class Player extends GameObject{
      */
     public abstract void bet(BettingContext context);
 
+    /**
+     * ROADMAP item 27/persistent-game-state design doc §2a: a stable,
+     * permanent id for what kind of player this is (human, or which AI
+     * class + personality) -- independent of this player's own `name` field
+     * (which is cosmetic/user-typed for Human, or a display label for AI) and
+     * independent of Java class names, so a save file's player-identity field
+     * never breaks from a cosmetic rename or class refactor. See
+     * PlayerArchetypeRegistry for the id -> factory lookup used when
+     * reconstructing a non-human player from a saved id.
+     */
+    public abstract String archetypeId();
+
     public int getScore() {
         return score;
     }

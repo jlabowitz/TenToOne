@@ -63,6 +63,17 @@ public class AI_Medium extends AI_Easy {
         this.personality = personality;
     }
 
+    /**
+     * ROADMAP item 27/persistent-game-state design doc §2a: overrides
+     * AI_Easy.ARCHETYPE_ID ("ai_easy") -- AI_Medium extends AI_Easy for its
+     * card-play engine, but its actual archetype identity is its personality,
+     * not AI_Easy's.
+     */
+    @Override
+    public String archetypeId() {
+        return personality.id();
+    }
+
     @Override
     public void bet(BettingContext context) {
         Hand hand = getHand();

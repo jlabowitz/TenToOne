@@ -1,9 +1,16 @@
 import java.util.List;
 
 public class AI_Zombie extends AI {
+    /** ROADMAP item 27/persistent-game-state design doc §2a -- see AI_Easy.ARCHETYPE_ID's doc. */
+    static final String ARCHETYPE_ID = "ai_zombie";
 
     public AI_Zombie(String name) {
         super(name);
+    }
+
+    @Override
+    public String archetypeId() {
+        return ARCHETYPE_ID;
     }
 
     @Override

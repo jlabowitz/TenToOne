@@ -58,6 +58,7 @@ to `DONE.md`.)
 | 24 | ML-driven AI ("find the optimal strategy") | deferred | XL, open-ended | agent TBD |
 | 25 | Card-counting AI tiers (`AI_Hard`/`AI_Expert`) + Expert per-opponent bet-trust history | deferred | L, open-ended | agent TBD |
 | 26 | Dev-mode per-seat AI tier/personality swap + personality-visibility debug display | deferred, blocked on item 5 | S | agent TBD |
+| 27 | Deterministic RNG seeding (deck shuffle, reproducible deals) | ready | S | `senior-developer` |
 
 All live visual sanity checks previously owed here (invalid-move feedback,
 start screen/rules/name entry) were walked by the user once back at their
@@ -102,6 +103,8 @@ cleanup, which nothing below is currently tracking as its own item.
 Added 2026-07-05 from `SUGGESTIONS.md` triage (suggestions #8, #9, #15/"Punish", #16, #21, #22, #27), positioned as the next active AI item once the AI & polish item (`DONE.md`) wrapped. Full detail lives in `design/ai-v2-opponent-modeling.md` — **read that doc directly, this summary is intentionally short and will go stale otherwise.**
 
 **Status as of 2026-07-06**: the doc's own §6-recommended first pass has shipped (commit `e88573e`) — below/above-bet win-by-least split, a reacting-branch suit-void discard tiebreak, a forced-win dangerous-card ranking, and an additive trump-weighting bet dial, all landed in `AI_Medium`/`AIPersonality`. The user hands-on played it the same session; the doc's new §7 captures what was confirmed working and what's open for the next pass: the `PlayContext` engine hook plus the full "Punish" mechanic (defensive decline, offensive bait, sacrifice — §1), a new needs-relative "win-confidence bucket" mechanic flagged as its own candidate `game-designer` pass (not yet scoped — see §7.2-D), and a committed asymmetric trump-vs-offsuit round-weighting addition to the betting formula (§7.2-C).
+
+**Update, same day, second session**: the user found `design/ai-v2-opponent-modeling.md`'s §1 ("Punish") had drifted from their intent across its revision passes — "Punish" should name only the Sacrifice idea, the old "offensive bait" mechanic is retracted outright (an AI at `trickScore == bet` is the exposed party, not the exploiter), and the decline mechanic needed its discard logic reworked, not its name. Reworked into a new, standalone doc, `design/ai-v2-punish-mechanic.md`, which supersedes old §1 (that section is marked accordingly, kept for historical record only). **Awaiting the user's sign-off on the new doc before any implementation starts** — see that doc's §6 for the resulting scope: Punish (needs the `PlayContext` hook) is the priority piece; a smaller hook-free decline/discard fix can ship independently; the retracted bait/leading-advantage threads fold into one deferred relative-strength-tracking idea, to be scoped together with §7.2-A/D in a future `game-designer` pass.
 
 Distinct from item 25 (`AI_Hard`/`AI_Expert` card-counting tiers): this item is heuristic/behavioral upgrades to `AI_Medium`-tier logic that don't need new card-counting infrastructure, so it can proceed independently of, and before, item 25. Suggestion #12 (partial-information reasoning about which trump ranks are still in play) is **not** folded in here — it's the same thing item 25's card-counting scope (§6) already covers; see that item instead.
 
@@ -474,6 +477,32 @@ which personality/tier is actually running under the hood per opponent seat.
 Explicitly sequenced after item 5 exists, not concurrently with it.
 
 The user has already been hand-testing per-seat AI swaps manually via an uncommitted, in-progress edit to `Game.java` — not to be touched or treated as a spec for this item, just noted here as evidence of real near-term demand.
+
+### 27. Deterministic RNG seeding (deck shuffle, reproducible deals) — `ready` — S — `senior-developer`
+Added 2026-07-07 per the user's explicit request, surfaced during scoping for
+a new persistent-game-state design doc (`design/persistent-game-state.md`,
+prerequisite work for items 10/14). `Deck.shuffleDeck()` today calls
+`Collections.shuffle(cards)` with an implicit default `Random` — nothing
+records which seed produced a given deal. Scope: make the shuffle accept an
+injectable seed (defaulting to a freshly-generated one each run, so today's
+behavior is unchanged by default), and expose/record whichever seed actually
+got used. Two concrete uses: reproducing an exact deal for a bug report, and
+writing deterministic test fixtures for the persistent-game-state
+reconstruction codec (item 27's real near-term motivation — that codec's
+correctness is the piece the user is most worried about getting right, and a
+seeded deck makes "deal a known hand" trivial to set up in a test instead of
+fighting real shuffle randomness).
+
+Same two other `new Random()` call sites in `Game.java` (initial
+`roundStartingPlayer`, and `restartForNewGame()`'s re-roll) are the same kind
+of implicit randomness — worth a look in the same pass, though the user's
+own ask was specifically about the deck.
+
+The user separately floated seeding extending to "opponent types generated"
+— not actionable yet, since AI seat assignment is hardcoded today
+(`Game.java`'s constructor switch), not randomly generated; noted here as
+future scope only, relevant if/when item 15 (freeplay mode) or a
+random-opponent-selection feature is ever built.
 
 ---
 

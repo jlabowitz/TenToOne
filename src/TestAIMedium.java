@@ -178,7 +178,7 @@ public class TestAIMedium {
 
     private static AIPersonality withTrumpWeightK(double trumpWeightK) {
         AIPersonality balanced = AIPersonality.MEDIUM_BALANCED;
-        return new AIPersonality(balanced.name(), balanced.tier(), balanced.riskTolerance(),
+        return new AIPersonality(balanced.id(), balanced.name(), balanced.tier(), balanced.riskTolerance(),
                 balanced.opponentBetTrust(), balanced.recallCapacity(), balanced.recallAccuracy(),
                 balanced.offSuitTrackingEnabled(), balanced.offSuitAccuracyMultiplier(),
                 balanced.offSuitRelevanceThreshold(), balanced.voidProgressWeight(), balanced.cardValueWeight(),

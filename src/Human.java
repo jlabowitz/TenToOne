@@ -2,6 +2,9 @@ import java.awt.Point;
 import java.util.List;
 
 public class Human extends Player{
+    /** ROADMAP item 27/persistent-game-state design doc §2a -- see AI_Easy.ARCHETYPE_ID's doc. */
+    static final String ARCHETYPE_ID = "human";
+
     private final MouseInput mouseInput;
     private final Handler handler;
     //ROADMAP follow-up: threaded through so the three click loops below can
@@ -11,16 +14,42 @@ public class Human extends Player{
     //class for the shared instances passed in.
     private final AchievementToast achievementToast;
     private final SaveData saveData;
+    /**
+     * design/persistent-game-state.md Phase 7: invoked right before and right
+     * after each of this class's three blocking click-loops (bet/playCard/
+     * nextTrick) -- the moments closest to "the app could plausibly be closed
+     * right now," per the design doc §6. A plain Runnable rather than a new
+     * named functional interface -- this class already threads several
+     * single-purpose collaborators as plain constructor params, and a
+     * zero-arg "do the checkpoint save" callback needs no more shape than
+     * Runnable already provides.
+     */
+    private final Runnable checkpointSaver;
 
+    /**
+     * Convenience overload for callers that don't need checkpoint saves
+     * (every existing test, and any future non-gameplay construction) --
+     * delegates to the 6-arg constructor with a no-op callback.
+     */
     public Human(String name, MouseInput mouseInput, Handler handler, AchievementToast achievementToast, SaveData saveData) {
+        this(name, mouseInput, handler, achievementToast, saveData, () -> {});
+    }
+
+    public Human(String name, MouseInput mouseInput, Handler handler, AchievementToast achievementToast,
+                 SaveData saveData, Runnable checkpointSaver) {
         super(name);
         this.mouseInput = mouseInput;
         this.handler = handler;
         this.achievementToast = achievementToast;
         this.saveData = saveData;
+        this.checkpointSaver = checkpointSaver;
         id = ID.HUMAN;
     }
 
+    @Override
+    public String archetypeId() {
+        return ARCHETYPE_ID;
+    }
 
     @Override
     public void bet(BettingContext context) {
@@ -43,7 +72,11 @@ public class Human extends Player{
         IllegalPlayFeedback feedback = new IllegalPlayFeedback();
         handler.addObject(feedback);
         mouseInput.clearClicks();
+        // design/persistent-game-state.md Phase 7: right before this blocking
+        // click-loop starts.
+        checkpointSaver.run();
         try {
+            betLoop:
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
@@ -76,7 +109,7 @@ public class Human extends Player{
                         if (Round.isLegalBet(candidate, maxBet, sumOfPriorBets, maxBet,
                                 isLastBettor, totalBetsCannotEqualTricks)) {
                             setBet(candidate);
-                            return;
+                            break betLoop;
                         }
                         int forbiddenBet = maxBet - sumOfPriorBets;
                         feedback.trigger(illegalBetReason(forbiddenBet));
@@ -88,6 +121,8 @@ public class Human extends Player{
             handler.removeObject(feedback);
             handler.removeObject(stepper);
         }
+        // design/persistent-game-state.md Phase 7: right after the click-loop resolves.
+        checkpointSaver.run();
     }
 
     /**
@@ -113,6 +148,10 @@ public class Human extends Player{
         mouseInput.clearClicks();
         IllegalPlayFeedback feedback = new IllegalPlayFeedback();
         handler.addObject(feedback);
+        // design/persistent-game-state.md Phase 7: right before this blocking
+        // click-loop starts.
+        checkpointSaver.run();
+        Card played;
         try {
             while (true) {
                 Point click = mouseInput.awaitClick();
@@ -141,11 +180,15 @@ public class Human extends Player{
                 }
                 getHand().playCard(card);
                 System.out.println(getName() + " played the " + card);
-                return card;
+                played = card;
+                break;
             }
         } finally {
             handler.removeObject(feedback);
         }
+        // design/persistent-game-state.md Phase 7: right after the click-loop resolves.
+        checkpointSaver.run();
+        return played;
     }
 
     /**
@@ -171,8 +214,11 @@ public class Human extends Player{
         System.out.println("Click anywhere to move on to the next trick.");
         NextTrickPrompt prompt = new NextTrickPrompt();
         handler.addObject(prompt);
+        mouseInput.clearClicks();
+        // design/persistent-game-state.md Phase 7: right before this blocking
+        // click-loop starts.
+        checkpointSaver.run();
         try {
-            mouseInput.clearClicks();
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
@@ -189,10 +235,12 @@ public class Human extends Player{
                     mouseInput.clearClicks();
                     continue;
                 }
-                return;
+                break;
             }
         } finally {
             handler.removeObject(prompt);
         }
+        // design/persistent-game-state.md Phase 7: right after the click-loop resolves.
+        checkpointSaver.run();
     }
 }

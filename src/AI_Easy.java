@@ -2,6 +2,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AI_Easy extends AI{
+    /**
+     * ROADMAP item 27/persistent-game-state design doc §2a: permanent,
+     * cosmetic-rename-proof identity id for save-file player-identity fields
+     * -- see PlayerArchetypeRegistry. AI_Medium overrides archetypeId() to
+     * return its own personality's id instead of inheriting this one.
+     */
+    static final String ARCHETYPE_ID = "ai_easy";
+
     private final int NUM_HIGH_TRUMP = 6;
     private final int NUM_HIGH_CARDS = 2;
     private final double HIGH_TRUMP_PERCENT = 1;
@@ -9,6 +17,11 @@ public class AI_Easy extends AI{
 
     public AI_Easy(String name) {
         super(name);
+    }
+
+    @Override
+    public String archetypeId() {
+        return ARCHETYPE_ID;
     }
 
     @Override

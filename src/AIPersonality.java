@@ -12,6 +12,8 @@
  * start reading recallCapacity/recallAccuracy/the off-suit-tracking fields.
  */
 public record AIPersonality(
+        String id,                        // ROADMAP item 27/persistent-game-state design doc §2a --
+                                           // stable, permanent, decoupled from `name` (cosmetic, not final)
         String name,
         int tier,
         double riskTolerance,             // §4.5
@@ -42,9 +44,9 @@ public record AIPersonality(
      * needs a real tuning/playtesting pass later, not a settled value.
      */
     public static final AIPersonality MEDIUM_BALANCED =
-            new AIPersonality("Balanced", 2, 0.5, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
+            new AIPersonality("medium_balanced", "Balanced", 2, 0.5, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
     public static final AIPersonality MEDIUM_BOLD =
-            new AIPersonality("Bold", 2, 0.9, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
+            new AIPersonality("medium_bold", "Bold", 2, 0.9, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
     public static final AIPersonality MEDIUM_CAUTIOUS =
-            new AIPersonality("Cautious", 2, 0.1, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
+            new AIPersonality("medium_cautious", "Cautious", 2, 0.1, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
 }

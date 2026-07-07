@@ -29,6 +29,25 @@ public class Game extends Canvas implements Runnable{
     private int roundStartingPlayer;
     private final int roundBonus = 10;
 
+    /**
+     * design/persistent-game-state.md Phase 4: promoted from play()'s local
+     * variable so a checkpoint fired anywhere (e.g. from inside Human's
+     * blocking click-loops, several stack frames deep) can reach the round
+     * currently in progress -- and, via Round's own getCurrentTrick(), the
+     * trick in progress too. Set at the top of each roundIndex loop
+     * iteration; nulled out again as soon as playOneRound()'s round.playRound()
+     * call returns, i.e. right after the round has actually finished (empty
+     * hands, reset trick scores). Code-review fix: this used to stay set to
+     * the just-finished Round for the rest of the loop-body iteration, which
+     * meant the two checkpoints inside showRoundSummary() (called later in
+     * the same iteration) wrote a non-null RoundSnapshot for a round that had
+     * already ended -- violating GameStateSnapshot.round's own "null if
+     * between rounds" contract. Nulling it here instead means anything
+     * checkpointed for the rest of this iteration (currently just
+     * showRoundSummary's two calls) correctly reports "between rounds."
+     */
+    private Round currentRound;
+
     //ROADMAP item 1 (play-again restart): kept so restartForNewGame() can
     //re-invoke the Start Screen name-capture seam a second time -- this was
     //a constructor parameter only before, never stored.
@@ -39,6 +58,12 @@ public class Game extends Canvas implements Runnable{
     //SaveStore's class doc for why this is never deferred to process exit.
     private final SaveStore saveStore;
     private final SaveData saveData;
+
+    //design/persistent-game-state.md Phase 6/7: mirrors saveStore/saveData's
+    //own long-lived-for-the-session field pattern -- checkpoints are written
+    //continuously throughout play (see saveGameStateCheckpoint()), not just
+    //at round/game boundaries.
+    private final GameStateStore gameStateStore;
 
     //ROADMAP item 1 (design/ai-and-polish.md §3): plain code-only config
     //holder, no UI reads/writes it yet -- see GameSettings' own class doc.
@@ -105,6 +130,17 @@ public class Game extends Canvas implements Runnable{
         return new SaveStore();
     }
 
+    /**
+     * design/persistent-game-state.md Phase 6/7: new seam, package-private
+     * and non-final, mirroring buildSaveStore()'s own testability pattern --
+     * a test subclass overrides this to point at a temp file instead of the
+     * real {@code ~/.tentoone}, so constructing a (Headless)Game in a test
+     * never touches the real game-state save file.
+     */
+    GameStateStore buildGameStateStore() {
+        return new GameStateStore();
+    }
+
     public Game(List<String> aiNames) {
         handler = new Handler();
         mouseInput = new MouseInput();
@@ -115,6 +151,7 @@ public class Game extends Canvas implements Runnable{
 
         saveStore = buildSaveStore();
         saveData = saveStore.load();
+        gameStateStore = buildGameStateStore();
         achievementToast = new AchievementToast();
         handler.keepOnTop(achievementToast);
 
@@ -129,7 +166,10 @@ public class Game extends Canvas implements Runnable{
         assert numPlayers <= 5 : "You cannot have more than 5 players";
 
         players = new ArrayList<>();
-        players.add(new Human(humanName, mouseInput, handler, achievementToast, saveData));
+        //design/persistent-game-state.md Phase 7: the checkpoint callback
+        //reads Game's own live fields (currentRound et al.) at call time via
+        //this method reference -- never a captured stale copy.
+        players.add(new Human(humanName, mouseInput, handler, achievementToast, saveData, this::saveGameStateCheckpoint));
         for (String aiName : aiNames) {
             //players.add(new AI_Easy(aiName));
             //players.add(new AI_Medium(aiName, AIPersonality.MEDIUM_BALANCED));
@@ -170,6 +210,66 @@ public class Game extends Canvas implements Runnable{
         roundIndex = 0;
         Random r = new Random();
         roundStartingPlayer = r.nextInt(numPlayers);
+    }
+
+    /**
+     * design/persistent-game-state.md Phase 8: reconstructs a live, playable
+     * Game directly from a saved snapshot -- skips the normal constructor's
+     * Start Screen click-loop/captureHumanName/hardcoded AI-personality
+     * assignment entirely, since all of that state already exists in
+     * SNAPSHOT (via GameStateCodec.fromSnapshot). Not called from main() or
+     * the Start Screen this pass -- the hamburger-menu/Start-Screen "Resume
+     * Game" UI (ROADMAP item 10/14) that would call this is explicitly out
+     * of scope here; exercised directly by tests only.
+     *
+     * aiNames is approximated from the reconstructed non-human players'
+     * names -- the only thing aiNames is used for post-construction is
+     * captureHumanName's Start Screen AI-name display list, consulted again
+     * by restartForNewGame() after a resumed game's eventual Play Again.
+     * This is a reasonable approximation (a snapshot doesn't separately
+     * carry the original aiNames list), but what Play-Again-after-a-resumed-
+     * game should really do is an open product question, not decided here --
+     * flagging for whoever designs the actual Resume UI.
+     */
+    Game(GameStateSnapshot snapshot) throws GameStateReconstructionException {
+        handler = new Handler();
+        mouseInput = new MouseInput();
+        keyInput = new KeyInput();
+        this.addMouseListener(mouseInput);
+        this.addKeyListener(keyInput);
+        this.setFocusable(true);
+
+        saveStore = buildSaveStore();
+        saveData = saveStore.load();
+        gameStateStore = buildGameStateStore();
+        achievementToast = new AchievementToast();
+        handler.keepOnTop(achievementToast);
+
+        buildWindow();
+
+        GameStateCodec.Reconstructed reconstructed = GameStateCodec.fromSnapshot(snapshot, WIDTH, HEIGHT, handler,
+                mouseInput, achievementToast, saveData, this::saveGameStateCheckpoint);
+
+        players = reconstructed.players;
+        this.aiNames = players.stream()
+                .filter(player -> player.getID() == ID.AI)
+                .map(Player::getName)
+                .collect(Collectors.toList());
+
+        renderPlayers();
+
+        currentRound = reconstructed.round;
+        if (currentRound != null) {
+            // Round reconstruction (inside fromSnapshot, above) positioned
+            // the human's hand using the player's x/y *before* renderPlayers()
+            // (just above) had actually set it -- fix it up now that it has.
+            currentRound.repositionHumanHand();
+        }
+
+        roundIndex = snapshot.roundIndex;
+        roundStartingPlayer = snapshot.roundStartingPlayer;
+        roundsHitBonusThisGame = snapshot.roundsHitBonusThisGame;
+        wasSoleLastAtHalfway = snapshot.wasSoleLastAtHalfway;
     }
 
     /**
@@ -264,60 +364,16 @@ public class Game extends Canvas implements Runnable{
         while (true) {
             //for each round
             while (roundIndex < 10) {
-                int currentPlayer = roundStartingPlayer;
-                Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
-
-                //bet
-                round.bet(currentPlayer, gameSettings);
-
-                //play round
-                round.playRound();
-
-                //handler.removeAll();
-
-                //snapshot bet/tricksTaken before adjustScores() resets each
-                //player's trickScore to 0 -- see RoundResultRow's class doc
-                List<RoundResultRow> results = snapshotRoundResults(getPlayers(), roundBonus);
-
-                //adjust scores accordingly
-                adjustScores();
-                printScores();
-                applyTotals(results, getPlayers());
-
-                //ROADMAP item 2: round-end achievement checks -- SCORE_OVER_50/
-                //_100 against the human's running score, PERFECT_ROUND for this
-                //round's bonus hit, plus the two pieces of ephemeral per-game
-                //state FLAWLESS_GAME/COMEBACK_KID need at game-end. Written to
-                //disk immediately after (not deferred to game-end), matching
-                //this feature's "no clean-shutdown hook" design.
-                RoundResultRow humanRow = results.stream().filter(row -> row.isHuman).findFirst()
-                        .orElseThrow(() -> new IllegalStateException("No human row in round results"));
-                List<Achievement> newlyUnlockedThisRound =
-                        AchievementEngine.checkRoundEnd(saveData, humanRow.totalAfter, humanRow.bonusHit);
-                if (humanRow.bonusHit) {
-                    roundsHitBonusThisGame++;
-                }
-                //Round-5 halfway snapshot: roundIndex is still 4 here (it
-                //increments below, after this block), i.e. this is right
-                //after the round where roundIndex was 4 -- the 5th of 10.
-                if (roundIndex == 4) {
-                    List<Integer> otherScores = results.stream()
-                            .filter(row -> !row.isHuman)
-                            .map(row -> row.totalAfter)
-                            .collect(Collectors.toList());
-                    wasSoleLastAtHalfway = AchievementEngine.isSoleLastPlace(humanRow.totalAfter, otherScores);
-                }
-                saveStore.save(saveData);
-                achievementToast.enqueueAll(newlyUnlockedThisRound);
-
-                showRoundSummary(roundIndex, results);
-
-                roundStartingPlayer = nextPlayer(roundStartingPlayer);
-                this.roundIndex++;
+                playOneRound();
             }
             //determine winner
             Player winner = determineWinner();
             System.out.println(winner.getName() + " won the game!");
+
+            //design/persistent-game-state.md Phase 8: a completed game
+            //shouldn't offer resume -- clear the saved game now, before the
+            //game-over banner/Play Again flow even starts.
+            gameStateStore.clear();
 
             //ROADMAP item 2: game-end achievement/stat checks -- updates
             //gamesPlayed/gamesWon/highScore/currentWinStreak/bestWinStreakEver
@@ -345,6 +401,78 @@ public class Game extends Canvas implements Runnable{
             handler.removeObject(banner);
             restartForNewGame();
         }
+    }
+
+    /**
+     * Extracted from play()'s per-round loop body -- package-private test
+     * seam (mirrors buildWindow/captureHumanName's existing testability-seam
+     * convention) so a test can drive exactly one real round boundary
+     * directly, without scripting clicks through play()'s whole forever-loop
+     * (bet, betting, all ten rounds, game-over banner, Play Again, etc.).
+     * Deals and plays one Round to completion, applies its results, then
+     * shows the round-summary click-to-continue gate before advancing
+     * roundStartingPlayer/roundIndex for the next call.
+     */
+    void playOneRound() {
+        int currentPlayer = roundStartingPlayer;
+        Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
+        currentRound = round;
+
+        //bet
+        round.bet(currentPlayer, gameSettings);
+
+        //play round
+        round.playRound();
+
+        //handler.removeAll();
+
+        //Code-review fix (design/persistent-game-state.md): the round has
+        //now actually finished (empty hands, reset trick scores once
+        //adjustScores() below runs) -- null this out now, before
+        //showRoundSummary()'s two checkpoints below, so they correctly
+        //report "between rounds" (round == null) rather than a snapshot of
+        //the round that just ended. See the field's own doc.
+        currentRound = null;
+
+        //snapshot bet/tricksTaken before adjustScores() resets each
+        //player's trickScore to 0 -- see RoundResultRow's class doc
+        List<RoundResultRow> results = snapshotRoundResults(getPlayers(), roundBonus);
+
+        //adjust scores accordingly
+        adjustScores();
+        printScores();
+        applyTotals(results, getPlayers());
+
+        //ROADMAP item 2: round-end achievement checks -- SCORE_OVER_50/
+        //_100 against the human's running score, PERFECT_ROUND for this
+        //round's bonus hit, plus the two pieces of ephemeral per-game
+        //state FLAWLESS_GAME/COMEBACK_KID need at game-end. Written to
+        //disk immediately after (not deferred to game-end), matching
+        //this feature's "no clean-shutdown hook" design.
+        RoundResultRow humanRow = results.stream().filter(row -> row.isHuman).findFirst()
+                .orElseThrow(() -> new IllegalStateException("No human row in round results"));
+        List<Achievement> newlyUnlockedThisRound =
+                AchievementEngine.checkRoundEnd(saveData, humanRow.totalAfter, humanRow.bonusHit);
+        if (humanRow.bonusHit) {
+            roundsHitBonusThisGame++;
+        }
+        //Round-5 halfway snapshot: roundIndex is still 4 here (it
+        //increments below, after this block), i.e. this is right
+        //after the round where roundIndex was 4 -- the 5th of 10.
+        if (roundIndex == 4) {
+            List<Integer> otherScores = results.stream()
+                    .filter(row -> !row.isHuman)
+                    .map(row -> row.totalAfter)
+                    .collect(Collectors.toList());
+            wasSoleLastAtHalfway = AchievementEngine.isSoleLastPlace(humanRow.totalAfter, otherScores);
+        }
+        saveStore.save(saveData);
+        achievementToast.enqueueAll(newlyUnlockedThisRound);
+
+        showRoundSummary(roundIndex, results);
+
+        roundStartingPlayer = nextPlayer(roundStartingPlayer);
+        this.roundIndex++;
     }
 
     /**
@@ -383,9 +511,46 @@ public class Game extends Canvas implements Runnable{
         return mouseInput;
     }
 
+    /** Test-only accessor (package-private), mirroring getMouseInput() above -- not otherwise needed by any shipped test in this pass; added to let a one-off manual verification harness drive real name entry without depending on real OS window focus. */
+    KeyInput getKeyInput() {
+        return keyInput;
+    }
+
     /** Test-only accessor (package-private) -- see awaitPlayAgain's dismiss-wiring test in TestGame. */
     AchievementToast getAchievementToast() {
         return achievementToast;
+    }
+
+    /** design/persistent-game-state.md Phase 4: the round currently in progress, or null before the first round is constructed. */
+    Round getCurrentRound() {
+        return currentRound;
+    }
+
+    /**
+     * design/persistent-game-state.md Phase 7: assembles a GameStateSnapshot
+     * from Game's own live fields (read at call time, never a stale capture --
+     * see the constructor's comment on the Human callback) and writes it via
+     * gameStateStore. Invoked from Human's checkpoint callback (bet/playCard/
+     * nextTrick's blocking loops) and directly around showRoundSummary()'s
+     * own click-to-continue gate. Never throws out to the caller -- a failed
+     * checkpoint save must not interrupt gameplay, matching
+     * SaveStore/GameStateStore's own never-crash-gameplay convention (each
+     * already catches its own IOExceptions; this catches anything else that
+     * could conceivably escape the snapshot-assembly step itself).
+     */
+    void saveGameStateCheckpoint() {
+        try {
+            GameStateSnapshot snapshot = GameStateCodec.toSnapshot(roundIndex, roundStartingPlayer,
+                    roundsHitBonusThisGame, wasSoleLastAtHalfway, getPlayers(), currentRound);
+            gameStateStore.save(snapshot);
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /** design/persistent-game-state.md Phase 8: whether a resumable saved game exists on disk. */
+    public boolean hasResumableGame() {
+        return gameStateStore.exists();
     }
 
     /**
@@ -399,6 +564,12 @@ public class Game extends Canvas implements Runnable{
      * without driving play()'s full click-driven loop.
      */
     void restartForNewGame() {
+        //design/persistent-game-state.md Phase 8: the one other real
+        //explicit-restart code path in this codebase -- cheap/idempotent
+        //even though play()'s own game-end clear (right before this method's
+        //normal call site) has already run; matters if some future path ever
+        //restarts without going through the normal game-end flow.
+        gameStateStore.clear();
         for (Player player : getPlayers()) {
             player.resetForNewGame();
         }
@@ -498,6 +669,10 @@ public class Game extends Canvas implements Runnable{
      */
     private void showRoundSummary(int roundIndex, List<RoundResultRow> results) {
         RoundSummaryPanel panel = new RoundSummaryPanel(roundIndex, results);
+        // design/persistent-game-state.md Phase 7: right before this
+        // click-to-continue gate shows -- Game already has everything it
+        // needs directly, no Human-callback plumbing required here.
+        saveGameStateCheckpoint();
         handler.addObject(panel);
         try {
             mouseInput.clearClicks();
@@ -505,6 +680,8 @@ public class Game extends Canvas implements Runnable{
         } finally {
             handler.removeObject(panel);
         }
+        // design/persistent-game-state.md Phase 7: right after the click resolves.
+        saveGameStateCheckpoint();
     }
 
     /**
