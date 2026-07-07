@@ -352,6 +352,53 @@ persistence layer with the (still-open) Replay/score history item — that
 item now points back here (`SaveStore`/`SaveData`) rather than describing a
 persistence layer that doesn't exist yet.
 
+### 14. AI & polish (opponent-aware betting, bet-legality rule, `AIPersonality`) — done, pushed, **user-confirmed**
+Scope locked 2026-07-04 by `project-manager`, after three rounds of
+`game-designer` design work (`design/ai-and-polish.md`, final scope per that
+doc's own §10 recommendation) plus user review between each round:
+- New `GameSettings` plain config holder (code-only, no UI yet) with
+  `totalBetsCannotEqualTricks` (default `true`).
+- Betting-legality rule (`Round.isLegalBet`, "total bets can't equal number of
+  tricks") — shared home in `Round.java` (not `Human`), a `Player.bet(...)`
+  signature change to thread the context it needs through `Round.bet()`'s
+  loop, `Human.isValidBet` retired in favor of the shared check, new
+  `TestBetLegality.java`, the sanctioned rounding/tie-break patch to
+  `AI_Easy`/`AI_Zombie`'s bet *output* (not their strategy), and new UX
+  feedback when a human hits the forbidden value (mirroring
+  `IllegalPlayFeedback`).
+- New `AI_Medium` class (extends `AI_Easy`, overrides only `bet()`): the
+  *full* opponent-bet-aware betting mechanism (§4 — distribution-aware
+  signal, grain-of-salt trust dampener, self-evident guaranteed-win floor,
+  risk-tolerance scaling) plus the last-round betting heuristic fix (§5).
+- `AIPersonality` config record (§7), wired into `AI_Medium`'s constructor.
+
+Commits `3de6080`, `b057260`, `9c5fc94`. Never modified `AI_Easy`/`AI_Zombie`'s
+strategy (only the sanctioned bet-output patch); `AI_Zombie` stays unused but
+intentionally kept as a future "easy" difficulty tier.
+
+**Deferred out of this pass** (see `ROADMAP.md`'s card-counting-tiers and
+dev-mode-AI-swap items): `AI_Hard`/`AI_Expert` classes and all of the design
+doc's §6 card-counting infrastructure (trump-indicator-rank + `onTrickComplete`
+engine hooks, two-axis recall capacity/accuracy dial, off-suit tracking
+extension), §4.2's Expert-tier per-opponent bet-trust history, and the
+dev-mode per-seat AI swap/personality-visibility hooks — these need either
+genuinely new engine/state infrastructure with no precedent in the codebase,
+or are sequenced after a dev-mode settings surface that didn't exist yet.
+
+**Reclassified `pending review` → `done` 2026-07-06**: implementation had
+been complete and locally committed since 2026-07-05, with only this
+project's process gates (push, live user sign-off) still outstanding. Both
+closed out this session: pushed to `origin/overhaul` (commit `e88573e`,
+bundled with `ROADMAP.md`'s AI v2 item's own first-pass work), and the user
+hands-on played a full session against all three `AI_Medium` personalities
+(Balanced/Bold/Cautious), confirming the betting mechanism and bet-legality
+rule work as designed. That same session surfaced calibration follow-ups on
+this now-locked formula (not bugs) — an odd bet from `Medium Cautious` on a
+weak hand, bet totals skewing high, and a request to weight trump more
+heavily than off-suit high cards in later rounds — logged under
+`ROADMAP.md`'s AI v2 item as tuning notes on this locked formula, not a
+reopening of it.
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.
