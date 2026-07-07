@@ -23,32 +23,42 @@ that item — this is "skip by default," not "never run."
 
 ## Status legend
 `ready` — unblocked, not started · `blocked` — waiting on a dependency ·
-`deferred` — real, but intentionally low priority. (`done` items have moved to
-`DONE.md`.)
+`deferred` — real, but intentionally low priority · `pending review` — code
+complete and committed locally, awaiting the user's live walk-through/
+sign-off and/or push before it moves to `DONE.md`. (`done` items have moved
+to `DONE.md`.)
 
 ## At a glance
 
 | # | Item | Status | Size | Primary owner |
 |---|------|--------|------|----------------|
-| 1 | AI & polish | in progress | M, open-ended | `senior-developer` |
-| 2 | Achievement toast redesign (box notification, non-fading, click-to-highlight) | ready | S-M | `game-designer` → `senior-developer` |
-| 3 | Dev mode: jump-to-round + extensible dev settings | ready | S-M | `game-designer` → `senior-developer` |
-| 4 | Accessibility: Enter-to-submit name, Tab-focus to Start Game | ready | S | `senior-developer` |
-| 5 | In-game legend for trick-state indicator symbols | ready | S | `game-designer` → `senior-developer` |
-| 6 | Legal-card min/max hand indicators | ready | S | `game-designer` → `senior-developer` |
-| 7 | Round summary panel enhancements (bonus-count column, rank column, phrasing/bold) | ready | S-M | `game-designer` → `senior-developer` |
-| 8 | In-play round/card-count HUD + hamburger menu | ready | M | `game-designer` → `senior-developer` |
-| 9 | Replay/score history (persistent storage) | ready | S-M | `senior-developer` |
-| 10 | Difficulty tiers: freeplay vs. journey mode | blocked — depends on item 1 | M-L, open-ended | agent TBD |
-| 11 | Trump-card/hand `Handler` leak | deferred | S | `senior-developer` |
-| 12 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-developer` |
-| 13 | Distributable executable + GitHub Release | deferred | S-M | `senior-developer` |
-| 14 | Multi-profile support | deferred | unclear, likely M | agent TBD |
-| 15 | Bapi visual/wording flourish | deferred | S | agent TBD |
-| 16 | "OP"/"Cheater" guaranteed-best-cards easter egg | deferred | unclear | agent TBD |
-| 17 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
-| 18 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
-| 19 | Full multiplayer web app (accounts, single/multiplayer) | deferred — needs its own dedicated scoping conversation before any work starts | XL, open-ended | agent TBD |
+| 1 | AI & polish | pending review | M, open-ended | `senior-developer` |
+| 2 | AI v2: opponent-modeling & endgame heuristics | in progress | M | `game-designer` → `senior-developer` |
+| 3 | Game log / persistent stats capture | ready (needs a short technical-spike decision first) | M | `senior-developer` |
+| 4 | Achievement toast redesign (box notification, non-fading, click-to-highlight) | ready | S-M | `game-designer` → `senior-developer` |
+| 5 | Multi-profile support | ready | unclear, likely M | agent TBD |
+| 6 | Dev mode: jump-to-round + extensible dev settings | ready | S-M | `game-designer` → `senior-developer` |
+| 7 | Accessibility: Enter-to-submit name, Tab-focus to Start Game | ready | S | `senior-developer` |
+| 8 | In-game legend for trick-state indicator symbols | ready | S | `game-designer` → `senior-developer` |
+| 9 | Legal-card min/max hand indicators | ready | S | `game-designer` → `senior-developer` |
+| 10 | Round summary panel enhancements (bonus-count column, rank column, phrasing/bold) | ready | S-M | `game-designer` → `senior-developer` |
+| 11 | In-play round/card-count HUD + hamburger menu | ready | M | `game-designer` → `senior-developer` |
+| 12 | Replay/score history (persistent storage) | ready | S-M | `senior-developer` |
+| 13 | Prefill player name on Play Again | ready | S | `senior-developer` |
+| 14 | Center hand-card layout as hand size shrinks | ready | S-M | `game-designer` → `senior-developer` |
+| 15 | Persist in-progress game state across app restarts (resume after close) | ready | M | `game-designer` → `senior-developer` |
+| 16 | Difficulty tiers: freeplay vs. journey mode | blocked — depends on item 1 | M-L, open-ended | agent TBD |
+| 17 | Trump-card/hand `Handler` leak | deferred | S | `senior-developer` |
+| 18 | Multi-monitor DPI rescale | deferred | unclear, likely M-L | `senior-developer` |
+| 19 | Distributable executable + GitHub Release | deferred | S-M | `senior-developer` |
+| 20 | Bapi visual/wording flourish | deferred | S | agent TBD |
+| 21 | "OP"/"Cheater" guaranteed-best-cards easter egg | deferred | unclear | agent TBD |
+| 22 | Full visual overhaul | deferred | XL, open-ended | agent TBD |
+| 23 | `src/` restructuring | deferred — design/planning only | design-only | agent TBD |
+| 24 | Full multiplayer web app (accounts, single/multiplayer) | deferred — needs its own dedicated scoping conversation before any work starts | XL, open-ended | agent TBD |
+| 25 | ML-driven AI ("find the optimal strategy") | deferred | XL, open-ended | agent TBD |
+| 26 | Card-counting AI tiers (`AI_Hard`/`AI_Expert`) + Expert per-opponent bet-trust history | deferred | L, open-ended | agent TBD |
+| 27 | Dev-mode per-seat AI tier/personality swap + personality-visibility debug display | deferred, blocked on item 6 | S | agent TBD |
 
 All live visual sanity checks previously owed here (invalid-move feedback,
 start screen/rules/name entry) were walked by the user once back at their
@@ -89,7 +99,14 @@ cleanup, which nothing below is currently tracking as its own item.
 
 ## Queue
 
-### 1. AI & polish — `in progress` — M — `senior-developer`
+### 1. AI & polish — `pending review` — M — `senior-developer`
+Reclassified from `in progress` to `pending review` 2026-07-05: v1 scope is
+fully implemented and committed locally (commits `3de6080`, `b057260`,
+`9c5fc94`), so no active coding remains. What's still outstanding is this
+file's own stated process gates (see the intro above) — pushing to
+`origin/overhaul` and showing the user a running instance for explicit
+sign-off — not implementation work.
+
 Scope locked 2026-07-04 by `project-manager`, after three rounds of
 `game-designer` design work (see `design/ai-and-polish.md` — read that file in
 full, not just this summary) plus user review between each round. Final v1
@@ -127,7 +144,31 @@ sanctioned rounding/legality patch to their bet output); `AI_Zombie` stays
 unused but is not to be deleted; new AI variants are new classes, not edits
 to the existing two.
 
-### 2. Achievement toast redesign (box notification, non-fading, click-to-highlight) — `ready` — S-M — `game-designer` → `senior-developer`
+### 2. AI v2: opponent-modeling & endgame heuristics — `in progress` — M — `game-designer` → `senior-developer` (downstream of item 1)
+Added 2026-07-05 from `SUGGESTIONS.md` triage (suggestions #8, #9, #15/"Punish", #16, #21, #22, #27) — the user flagged that AI-strategy suggestions make up a large fraction of this triage pass and that AI work should continue directly once item 1 wraps, so this is positioned as **the next active item after item 1 completes**, not folded into the already-deferred item 26. Distinct from item 26 (`AI_Hard`/`AI_Expert` card-counting tiers): this item targets heuristic/behavioral upgrades to the existing `AI_Medium`-tier logic that don't require new card-counting/trump-indicator-rank infrastructure, so it can proceed independently of, and before, item 26.
+
+**Punish mechanic (user-flagged high priority, "trivially easy to exploit" today)**: from suggestion #15 — an AI holding a trick-winning card it doesn't urgently need to play (because winning is already effectively secured, or because playing it now wouldn't cost anything) should recognize when *leading* a trick an opponent is likely to win, at no cost to itself, is a deliberate bait to draw out that opponent's high/guaranteed-win card before they need it — forcing them past their bet later once they no longer hold it. Today's easy exploit: a human can lead a middling-high trump early, force a "greedy" AI to win it, then know that AI no longer holds trump for later tricks.
+
+**Win-by-least heuristics (folds #8 + #16)**: when an AI is going last in a trick and can already win it, it should prefer the *lowest sufficient* winning card (especially trump) rather than its highest — save strong/guaranteed-win cards for later, since holding the literal highest card left in the game is itself a standing "guaranteed win" that doesn't need to be cashed in immediately, and playing it early both wastes that flexibility and reveals information to opponents about what's still uncommitted. Generalizes beyond the trump case to any "going last" situation per #16.
+
+**Endgame lead-risk awareness (#27)**: an AI that has already locked in its bet for the round shouldn't play a card that forces it into leading a later trick if leading trades a certain result for an avoidable risk (concrete anecdote: `Medium Balanced` played its ace of trump to hit 1/1, which then forced it to lead the final trick of the round and re-exposed it to a result it had already secured).
+
+**Betting-tuning follow-ups on the already-shipped, locked `AI_Medium` v1 formula (#9, #21, #22)** — not a reopening of item 1's locked scope, logged here as a calibration pass instead: a field anecdote of `Medium Cautious` betting 5 on what looked like a weak hand and missing badly (#9); an observation that AI bet totals seem to skew consistently *above* the round's trick count rather than a natural mix of over/under (#21); and a direction to weight trump more heavily than high off-suit cards specifically in later-round bets (#22).
+
+Suggestion #12 (partial-information reasoning about which trump ranks are still in play) is **not** folded in here — it's the same thing item 26's card-counting scope (§6) already covers; see that item instead.
+
+### 3. Game log / persistent stats capture — `ready` (needs a short technical-spike decision before implementation) — M — `senior-developer`
+Added 2026-07-05, merging `SUGGESTIONS.md` #4 (marked **High priority** by the user) and #28. The ask: log the outcome of every completed game — winner, every player's AI personality/settings (or "human"), and enough per-player detail to compute statistics later — to local persistent storage.
+
+Open technical question, not resolved here: whether this warrants an embedded SQL database (the user specifically asked about SQLite-from-Java) or can extend the existing `Properties`-file approach (`SaveStore`/`SaveData`, see `DONE.md` item 13) with structured per-game log entries instead. A real SQLite JDBC driver would be this project's first non-test external dependency (today only JUnit is vendored, in `lib/`, and only for tests) — worth weighing against a flat-file/structured-log approach before picking either.
+
+Relationship to two existing items, both cross-linked rather than merged:
+- **Item 12** (Replay/score history) is a lighter-weight, already-scoped feature (a browsable history of past scores) that also extends `SaveStore`. Whoever picks up either item should decide whether item 12 becomes a UI view over this log, or the two stay independently scoped.
+- **Item 25** (ML-driven AI) — #28 explicitly frames capturing this log as a precursor to future ML training data; this item is just the capture, not the ML work itself.
+
+Also profile-aware once item 5 (multi-profile) ships — this log should key by profile if/when multiple profiles exist.
+
+### 4. Achievement toast redesign (box notification, non-fading, click-to-highlight) — `ready` — S-M — `game-designer` → `senior-developer`
 Added 2026-07-04, after the user played the achievement toast shipped in
 `DONE.md` item 13 and its three follow-up fixes (longer hold,
 click-to-dismiss, in-game Achievements button) and decided the whole
@@ -159,7 +200,22 @@ reprioritization pass — this was already fully spec'd with nothing blocking
 it, and it directly addresses the user's own stated dissatisfaction with
 what just shipped, so leaving it deferred served no purpose.
 
-### 3. Dev mode: jump-to-round + extensible dev settings — `ready` — S-M — `game-designer` → `senior-developer`
+### 5. Multi-profile support — `ready` — size unclear, likely M — agent TBD
+Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`): multiple named
+profiles on the same device, each with their own achievements/stats
+(and, per item 12 above, presumably their own replay/score history too).
+Already anticipated, not yet built: `DONE.md` item 13 (Achievement system)
+shipped `SaveStore.resolveSaveFile(String profileName)` specifically so
+this wouldn't require a storage-format migration later — today it's always
+called with one implicit default profile. Whoever picks this up still needs
+to design profile creation/switching UI (presumably on or near the Start
+Screen, where the name is already entered) and decide how it interacts with
+name entry (is the typed name the profile, or a separate concept?) — not
+scoped further here since the user hasn't weighed in on that yet.
+
+**Promoted from `deferred` to `ready` and moved up in this 2026-07-05 triage pass**, per `SUGGESTIONS.md` suggestion #7: the user wants profile+achievement linking prioritized sooner than an indefinite deferral — not necessarily the #1 item, but no longer parked at the bottom of the queue.
+
+### 6. Dev mode: jump-to-round + extensible dev settings — `ready` — S-M — `game-designer` → `senior-developer`
 Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`). A developer-only
 mode, accessible for now (not necessarily gated later), that lets the user
 jump straight to a specific round instead of playing through from round 1 —
@@ -177,7 +233,7 @@ bet/score state for the skipped rounds or can start clean at round N with
 zero prior history, and how future dev settings get added to whatever
 surface this creates without redesigning it each time.
 
-### 4. Accessibility: Enter-to-submit name, Tab-focus to Start Game — `ready` — S — `senior-developer`
+### 7. Accessibility: Enter-to-submit name, Tab-focus to Start Game — `ready` — S — `senior-developer`
 Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`). Two small
 keyboard-accessibility gaps on the Start Screen: hitting Enter after typing
 a name should submit/start the game (same effect as clicking Start Game),
@@ -188,7 +244,7 @@ item 10's "deliberately deferred to a future options-menu pass" note on
 Enter-to-submit) — this is that pass. No design ambiguity here, routed
 straight to `senior-developer` rather than through `game-designer`.
 
-### 5. In-game legend for trick-state indicator symbols — `ready` — S — `game-designer` → `senior-developer`
+### 8. In-game legend for trick-state indicator symbols — `ready` — S — `game-designer` → `senior-developer`
 Flagged as a gap during the trick-state indicators' design spec (2026-07-02,
 shipped — see `DONE.md`): none of the three indicators (trick-leader dot,
 led-suit HUD line, high-card ring) explain themselves to a new player on
@@ -199,7 +255,7 @@ measured-but-empty legend slot waiting for exactly this
 `DONE.md`'s start-screen entry) — implementer should draw into that slot,
 not invent new bounds.
 
-### 6. Legal-card min/max hand indicators — `ready` — S — `game-designer` → `senior-developer`
+### 9. Legal-card min/max hand indicators — `ready` — S — `game-designer` → `senior-developer`
 Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #1). A red
 circle indicator on/near the lowest-valued legal card and a green circle
 indicator on/near the highest-valued legal card in the human's hand, similar
@@ -210,7 +266,7 @@ design-spec-then-implement approach the trick-state indicators used, given
 that item's history of pixel-collision bugs the spec's arithmetic didn't
 catch on the first pass.
 
-### 7. Round summary panel enhancements — `ready` — S-M — `game-designer` → `senior-developer`
+### 10. Round summary panel enhancements — `ready` — S-M — `game-designer` → `senior-developer`
 Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`), three related
 tweaks to `RoundSummaryPanel`/`GameOverBanner` (see `DONE.md` item 8 for
 that panel's original design):
@@ -230,12 +286,14 @@ Given `RoundSummaryPanel`'s history of pixel-collision/layout bugs on prior
 passes (see `DONE.md` items 7, 8, 11), this is worth a real `game-designer`
 spec pass on exact column layout rather than eyeballing it.
 
-### 8. In-play round/card-count HUD + hamburger menu — `ready` — M — `game-designer` → `senior-developer`
+### 11. In-play round/card-count HUD + hamburger menu — `ready` — M — `game-designer` → `senior-developer`
 Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #3). Two
 related pieces, both about in-play chrome:
 - A small always-visible status readout during play (not just between
   rounds) showing the current round number and how many cards are in the
   round — user suggested a small box in the top-right as one option.
+- The same always-visible readout should also show the running total of the opponents' bets so far in the round (`SUGGESTIONS.md` #18).
+- A simple yes/no HUD indicator for whether trump has been broken yet this round (`SUGGESTIONS.md` #6).
 - A hamburger-menu icon (top-left, per user's suggestion) exposing: Rules
   (already has a `RulesView` and hotspot pattern to reuse, see `DONE.md`),
   Restart (must show a confirmation popup requiring a second/explicit click
@@ -252,7 +310,7 @@ turn timers? animations? both?), and the state-retention mechanism for
 today suspends a game and returns to the start screen without discarding
 state).
 
-### 9. Replay/score history (persistent storage) — `ready` — S-M — `senior-developer`
+### 12. Replay/score history (persistent storage) — `ready` — S-M — `senior-developer`
 Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #4). A history
 of past game scores the user can look back at, stored in local persistent
 storage. The persistence layer this needs now already exists — see `DONE.md`
@@ -262,7 +320,18 @@ profile-scoped variant, see `SaveStore.resolveSaveFile(String)`). Extend
 that store/format rather than building a second, separate persistence
 mechanism.
 
-### 10. Difficulty tiers: freeplay vs. journey mode — `blocked` — M-L, open-ended — agent TBD (downstream of item 1)
+Forward-looking note from `SUGGESTIONS.md` #13: the user wants high scores tracked per-mode (depending on opponent strength/difficulty tier) — only meaningful once item 16 (freeplay vs. journey mode) exists, so not actionable yet, just logged here. See also item 3 (game log / persistent stats capture) for a heavier-weight, cross-linked sibling feature.
+
+### 13. Prefill player name on Play Again — `ready` — S — `senior-developer`
+Added 2026-07-05 from `SUGGESTIONS.md` #20. When the user clicks "Play Again" (see `DONE.md` item 11), the name field/flow should default to the name just used in the previous game rather than requiring it to be retyped from scratch.
+
+### 14. Center hand-card layout as hand size shrinks — `ready` — S-M — `game-designer` → `senior-developer`
+Added 2026-07-05 from `SUGGESTIONS.md` #23. As a round progresses and the human's hand shrinks, the remaining cards should shift toward horizontal center rather than staying left-anchored — most visible in the round of 1, where the single remaining card currently sits all the way at the hand's original left edge instead of centered on screen. General principle: minimize the spread progressively from the round of 10 down toward the center as cards are played. Routed through a `game-designer` spec pass first given `Hand`'s/`RoundSummaryPanel`'s established history of pixel-collision layout bugs on prior passes (see `DONE.md` items 7, 8, 11).
+
+### 15. Persist in-progress game state across app restarts (resume after close) — `ready` — M — `game-designer` → `senior-developer`
+Added 2026-07-05 from `SUGGESTIONS.md` #24. The user asked what happens to their win streak if they close the game mid-session, and wants the in-progress game state saved locally so it survives closing and relaunching the app entirely. Distinct from item 11's in-memory "back to main menu without restarting" (which only needs to survive within one running process) — this needs real disk persistence of mid-game state (round number, scores, bets, hands, deck state) and a load-on-launch UX (resume prompt vs. silent resume vs. explicit "continue game" entry point). Needs a `game-designer` pass on that UX question before implementation.
+
+### 16. Difficulty tiers: freeplay vs. journey mode — `blocked` — M-L, open-ended — agent TBD (downstream of item 1)
 Added 2026-07-03 from user suggestions (`SUGGESTIONS.md` idea #5). Two
 proposed modes: a **freeplay mode** where the user can directly pick an AI
 difficulty to play against, and a **journey mode** where harder tiers unlock
@@ -279,11 +348,11 @@ structure that conversation produces, not a separable feature.
 **Update 2026-07-04:** item 1's v1 pass (see above) ships a 3-tier ladder
 (`AI_Zombie`/`AI_Easy`/`AI_Medium`) rather than the full 5-tier ladder the
 original design doc scoped — `AI_Hard`/`AI_Expert` are deferred to new item
-21. This item stays `blocked`: a journey-mode unlock progression built
+26. This item stays `blocked`: a journey-mode unlock progression built
 against only 3 tiers would need rework once the other two land, so it's not
 worth starting this against a partial ladder.
 
-### 11. Trump-card/hand `Handler` leak — `deferred` — S — `senior-developer`
+### 17. Trump-card/hand `Handler` leak — `deferred` — S — `senior-developer`
 Discovered during `senior-code-reviewer`'s pass on the Play-again item (this
 session): `Round.renderTrumpCard()` and `Round.renderPlayerHand()` add a
 trump `Card`/`Hand` object to the `Handler` every round, but nothing anywhere
@@ -308,7 +377,7 @@ Fix, when picked up: track and remove the previous round's trump card in
 re-adding the same `Hand` reference to the `Handler` every round in
 `Round.renderPlayerHand()` (only add once per game, not once per round).
 
-### 12. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-developer`
+### 18. Multi-monitor DPI rescale — `deferred` — size unclear (likely M-L) — `senior-developer`
 Discovered 2026-07-02: dragging the game window from the user's primary
 monitor to a secondary monitor with a different Windows display-scale
 factor causes blurry/stretched rendering. Root cause: the game renders via a
@@ -325,7 +394,7 @@ Swing's more DPI-aware repaint pipeline.
 **Deferred**: doesn't affect the user's normal single-monitor workflow.
 Revisit if that changes.
 
-### 13. Distributable executable + GitHub Release — `deferred` — S-M — `senior-developer`
+### 19. Distributable executable + GitHub Release — `deferred` — S-M — `senior-developer`
 Added 2026-07-04 per user request, to make the game shareable with
 non-developer players (no git/JDK required on their end). Proposed approach,
 not yet scoped in detail: use `jpackage` (bundled with JDK 21) to produce a
@@ -336,21 +405,7 @@ plain app-image skips that but ships as a folder to unzip rather than a
 single installer file — that tradeoff is unresolved. **Deferred**: user
 doesn't need this now.
 
-### 14. Multi-profile support — `deferred` — size unclear, likely M — agent TBD
-Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`): multiple named
-profiles on the same device, each with their own achievements/stats
-(and, per item 9 above, presumably their own replay/score history too).
-Already anticipated, not yet built: `DONE.md` item 13 (Achievement system)
-shipped `SaveStore.resolveSaveFile(String profileName)` specifically so
-this wouldn't require a storage-format migration later — today it's always
-called with one implicit default profile. Whoever picks this up still needs
-to design profile creation/switching UI (presumably on or near the Start
-Screen, where the name is already entered) and decide how it interacts with
-name entry (is the typed name the profile, or a separate concept?) — not
-scoped further here since the user hasn't weighed in on that yet.
-**Deferred**: user doesn't need this now.
-
-### 15. Bapi visual/wording flourish — `deferred` — S — agent TBD
+### 20. Bapi visual/wording flourish — `deferred` — S — agent TBD
 Spun off from the Bapi easter-egg achievement (`DONE.md` item 13,
 2026-07-04): once the "Bapi" achievement itself is implemented, there's an
 open, explicitly deferred question about whether entering that name should
@@ -362,7 +417,7 @@ line attached to the achievement's own unlock toast. User explicitly said
 they don't know what they want yet — revisit now that the achievement itself
 has shipped and they've seen it in action.
 
-### 16. "OP"/"Cheater" guaranteed-best-cards easter egg — `deferred` — size unclear — agent TBD
+### 21. "OP"/"Cheater" guaranteed-best-cards easter egg — `deferred` — size unclear — agent TBD
 Raised by the user 2026-07-04 while finalizing the achievement system's
 design: entering a name like "OP," "Super OP," or "Cheater" (exact wording
 undecided — user floated these as brainstorm examples, not final) would put
@@ -373,13 +428,18 @@ name-triggered achievement unlock, so it's a heavier lift than a cosmetic
 easter egg. User explicitly said this isn't necessary right now — logged for
 later rather than scoped in detail.
 
-### 17. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
+### 22. Full visual overhaul — `deferred` — XL, open-ended — agent TBD
 Added 2026-07-02 per user request: "much later down the line," a full
 visual/art overhaul of the game beyond the functional UI fixes above.
 Intentionally deferred — revisit once the functional/UX backlog (item 1) is
 in a good place; scoping it now would be premature.
 
-### 18. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
+Additional brainstorm material folded in from 2026-07-05's `SUGGESTIONS.md` triage, all logged here rather than scoped in detail (consistent with this item's own "revisit later" status):
+- A poker-table visual theme (green felt background), from the user's own mental model of players "sitting at a table" (`SUGGESTIONS.md` #3).
+- Balatro-style card art as a copyright-free visual reference point, plus a distinct-suit-color scheme (blue for clubs, yellow for diamonds), and a trump-card-in-hand highlight treatment (gold outline, or a small star icon — user unsure which reads better against the game's existing gold accents) (`SUGGESTIONS.md` #25).
+- A "won last trick" indicator on NPC seats (so a player doesn't have to parse the full round-summary panel to see who just won), plus a poker-chip-style visual score representation (red chips = 10 points, white = 1, matching how the user scores in-person games with physical chips) — both explicitly flagged by the user as non-MVP (`SUGGESTIONS.md` #26).
+
+### 23. `src/` restructuring — `deferred` — design/planning only, not to be done now — agent TBD
 Added 2026-07-02 per user request, **explicitly planning-only — do not
 implement yet**. The current `src/` layout is flat: all production and test
 `.java` files live directly under `src/` with no subfolders, a structure the
@@ -411,7 +471,7 @@ a concrete list of what changes (build command, test invocation, CLAUDE.md,
 every file's package/import) before touching any files — not attempt the
 migration inline with unrelated work.
 
-### 19. Full multiplayer web app (accounts, single/multiplayer) — `deferred` — XL, open-ended, needs its own scoping conversation — agent TBD
+### 24. Full multiplayer web app (accounts, single/multiplayer) — `deferred` — XL, open-ended, needs its own scoping conversation — agent TBD
 Added 2026-07-04 from user suggestions (`SUGGESTIONS.md`): a "final version"
 idea of a full web-app rewrite/expansion with Google sign-in, single-player
 and multiplayer modes, playable with friends over the network. This is a
@@ -420,11 +480,11 @@ shape (`CLAUDE.md` frames this project as a personal, not-currently-shipping
 desktop app) — a web stack, user accounts, and real-time multiplayer netcode
 aren't an incremental feature on top of what exists today, they're close to
 a parallel project. **Explicitly deferred, not scoped further here** — same
-treatment as item 1 (AI & polish) and item 18 (`src/` restructuring): needs
+treatment as item 1 (AI & polish) and item 23 (`src/` restructuring): needs
 its own dedicated conversation with the user before any implementation
 starts, not something to plan or estimate speculatively in this queue entry.
 
-### 20. ML-driven AI ("find the optimal strategy") — `deferred` — XL, open-ended — agent TBD
+### 25. ML-driven AI ("find the optimal strategy") — `deferred` — XL, open-ended — agent TBD
 Split out of item 1's scoping conversation, 2026-07-04: the user's own stretch
 idea of eventually making an AI opponent ML-driven rather than heuristic/
 rule-based, floated during the `game-designer` design pass that produced
@@ -433,7 +493,11 @@ than detailing it. Confirmed by the user as out of scope for item 1's current
 pass — logged here as its own item so it isn't lost, not otherwise scoped or
 estimated.
 
-### 21. Card-counting AI tiers (`AI_Hard`/`AI_Expert`) + Expert per-opponent bet-trust history — `deferred` — L, open-ended — agent TBD
+Two additional pieces of scoping material from 2026-07-05's `SUGGESTIONS.md` triage:
+- A headless, UI-less fast-simulation runner (`SUGGESTIONS.md` #14) — needed to run enough games quickly to compare AI variants' statistical performance; a `HeadlessGame` construction path already exists in this codebase for test purposes (see `DONE.md` item 10) and may be a useful starting point.
+- A stretch idea (`SUGGESTIONS.md` #11) of AI opponents that mimic the user's own observed playstyle, with individually tunable percentage-based strategy weights, for self-play experimentation.
+
+### 26. Card-counting AI tiers (`AI_Hard`/`AI_Expert`) + Expert per-opponent bet-trust history — `deferred` — L, open-ended — agent TBD
 Split out of item 1's v1 scoping pass, 2026-07-04 (see `design/ai-and-polish.md`
 §6, §4.2, §10). Deferred as the heaviest remaining piece of the AI & polish
 design: full threshold/gap card-counting (tracking cards above an AI's
@@ -452,15 +516,19 @@ existing thing, `SaveData`, is cross-game persistent stats, not intra-match
 tracking). Not scoped further here — whoever picks this up should re-read
 `design/ai-and-polish.md` §6/§4.2 in full before starting.
 
-### 22. Dev-mode per-seat AI tier/personality swap + personality-visibility debug display — `deferred` — S, blocked on item 3 — agent TBD
+`SUGGESTIONS.md` #12 (partial-information reasoning — treating a held card as the effective highest in play when the odds of an undealt higher card showing up are low) is the same idea this item's §6 card-counting scope already covers; no separate item needed, just confirming alignment here.
+
+### 27. Dev-mode per-seat AI tier/personality swap + personality-visibility debug display — `deferred` — S, blocked on item 6 — agent TBD
 Split out of item 1's v1 scoping pass, 2026-07-04 (see `design/ai-and-polish.md`
 §1, §7's "dev-mode connective note"). A short-term testing aid (distinct from
-item 10's real, persistent journey-mode unlock progression): an entry in
-item 3's planned extensible dev-settings surface letting the user swap which
+item 16's real, persistent journey-mode unlock progression): an entry in
+item 6's planned extensible dev-settings surface letting the user swap which
 AI tier/personality is seated in a game right now, for testing, plus exposing
 (for debugging only, not player-facing) which personality/tier is actually
-running under the hood per opponent seat. Explicitly sequenced after item 3
+running under the hood per opponent seat. Explicitly sequenced after item 6
 exists, not concurrently with it.
+
+The user has already been hand-testing per-seat AI swaps manually via an uncommitted, in-progress edit to `Game.java` — not to be touched or treated as a spec for this item, just noted here as evidence of real near-term demand.
 
 ---
 
@@ -646,4 +714,4 @@ try capturing all screens (iterate
   (ML-driven AI) was split out and appended as its own explicitly-deferred
   entry, since the user confirmed it's out of scope for item 1's current
   pass but didn't want it lost.
-</content>
+- 2026-07-05: a full triage pass on `SUGGESTIONS.md`'s 28 numbered items (27 real entries — #10 was already deleted by the user before this pass). Two new items were added at the front of the active queue, both explicitly positioned per user direction as what comes next once item 1 finishes: new item 2 (AI v2: opponent-modeling & endgame heuristics, folding suggestions #8, #9, #15/"Punish", #16, #21, #22, #27 — the user flagged the "Punish" mechanic in particular as high priority and trivially exploitable today) and new item 3 (Game log / persistent stats capture, merging #4 — user-flagged High priority — and #28, cross-linked to items 12 and 25 rather than merged into either). Item 14 (multi-profile support) was promoted from `deferred` to `ready` and moved up to new item 5, per suggestion #7's explicit "sooner, not necessarily #1" request. Three new smaller items were added after the replay/score-history item: prefill-name-on-Play-Again (#20), centering the hand-card layout as a hand shrinks (#23), and persisting in-progress game state across app restarts (#24). Several suggestions were folded into existing items rather than made standalone: #18 (opponent bet totals) and #6 (trump-broken indicator) into the in-play HUD item; #13 (per-mode high scores) into replay/score history; #3 (poker table theme), #25 (Balatro art/suit colors/trump highlight), and #26 (won-last-trick indicator, poker-chip score visualization) into the full visual overhaul item; #14 (headless fast-sim runner) and #11 (mimic-human-strategy AI) into the ML-driven-AI item; #12 (partial-info trump-rank reasoning) confirmed as already covered by the card-counting item's existing §6 scope, not a separate fold. Two suggestions were dropped with no action: #1 (personality/strategy rework) was judged already substantially addressed by the shipped `AIPersonality` tunable-dial design; #17 and #19 were pure play-log anecdotes with no actionable request. One suggestion, #2 (a QA subagent's process-kill/window-focus-recovery safety incident during an earlier session), was deliberately **not** added to this game roadmap — it's a roster/tooling gap, not a game feature, and was routed to `tooling-architect` separately in the same session this triage happened. Every renumbered item's internal cross-references to other item numbers were updated to match this pass's new numbering.

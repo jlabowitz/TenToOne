@@ -70,10 +70,14 @@ public class Game extends Canvas implements Runnable{
     //AI-only: the human's name is captured live via the Start Screen
     //(captureHumanName), not passed in as a list slot -- see the constructor.
     private static final List<String> names = new ArrayList<>() {{
-        add("Player One");
-        add("Player Two");
-        add("Player Three");
-        add("Player Four");
+        // add("Player One");
+        // add("Player Two");
+        // add("Player Three");
+        // add("Player Four");
+        add("Medium Balanced");
+        add("Medium Bold");
+        add("Medium Cautious");
+        add("Easy");
     }};
 
     public Game() {
@@ -127,8 +131,42 @@ public class Game extends Canvas implements Runnable{
         players = new ArrayList<>();
         players.add(new Human(humanName, mouseInput, handler, achievementToast, saveData));
         for (String aiName : aiNames) {
-            players.add(new AI_Easy(aiName));
+            //players.add(new AI_Easy(aiName));
+            //players.add(new AI_Medium(aiName, AIPersonality.MEDIUM_BALANCED));
+            // — other personalities are MEDIUM_BOLD and MEDIUM_CAUTIOUS (see AIPersonality.java)
         }
+        for (int i = 0; i < aiNames.size(); i++) {
+            String aiName = aiNames.get(i);
+            AIPersonality personality;
+            switch (i) {
+                case 0:
+                    personality = AIPersonality.MEDIUM_BALANCED;
+                    break;
+                case 1:
+                    personality = AIPersonality.MEDIUM_BOLD;
+                    break;
+                case 2:
+                    personality = AIPersonality.MEDIUM_CAUTIOUS;
+                    break;
+                default:
+                    personality = null; // For AI_Easy, no personality needed
+                    break;
+            }
+            if (personality != null) {
+                players.add(new AI_Medium(aiName, personality));
+            } else {
+                players.add(new AI_Easy(aiName));
+            }
+        }
+        
+        
+        
+        // players.add(new AI_Medium(aiNames.get(0), AIPersonality.MEDIUM_BALANCED));
+        // players.add(new AI_Medium(aiNames.get(1), AIPersonality.MEDIUM_BOLD));
+        // players.add(new AI_Medium(aiNames.get(2), AIPersonality.MEDIUM_CAUTIOUS));
+        // players.add(new AI_Easy(aiNames.get(3)));
+
+
         roundIndex = 0;
         Random r = new Random();
         roundStartingPlayer = r.nextInt(numPlayers);

@@ -173,4 +173,91 @@ public class TestAIMedium {
 
         assertEquals(0, ai.getBet());
     }
+
+    // --- design/ai-v2-opponent-modeling.md §4.3: trump-weighting dial on pipelineBet ---
+
+    private static AIPersonality withTrumpWeightK(double trumpWeightK) {
+        AIPersonality balanced = AIPersonality.MEDIUM_BALANCED;
+        return new AIPersonality(balanced.name(), balanced.tier(), balanced.riskTolerance(),
+                balanced.opponentBetTrust(), balanced.recallCapacity(), balanced.recallAccuracy(),
+                balanced.offSuitTrackingEnabled(), balanced.offSuitAccuracyMultiplier(),
+                balanced.offSuitRelevanceThreshold(), balanced.voidProgressWeight(), balanced.cardValueWeight(),
+                balanced.valueNormalizationScale(), trumpWeightK);
+    }
+
+    /**
+     * §4.3's dial is a true no-op at numCardsThisRound == 10 (this game's max
+     * hand size, the top of the dial's real operating range) -- the
+     * multiplier is exactly 1.0 there regardless of K, so two personalities
+     * that only differ in trumpWeightK must produce the identical bet on the
+     * same 10-card hand. Empty priorBets (no opponent signal) isolates
+     * pipelineBet's naturalBet term as the only thing that could differ.
+     */
+    @Test
+    public void trumpWeightingIsNoOpAtTenCardHand() {
+        Hand hand = handOf(new Card(Suit.HEARTS, CardValue.ACE), new Card(Suit.HEARTS, CardValue.KING),
+                new Card(Suit.HEARTS, CardValue.QUEEN), new Card(Suit.DIAMONDS, CardValue.TWO),
+                new Card(Suit.DIAMONDS, CardValue.THREE), new Card(Suit.DIAMONDS, CardValue.FOUR),
+                new Card(Suit.DIAMONDS, CardValue.FIVE), new Card(Suit.DIAMONDS, CardValue.SIX),
+                new Card(Suit.DIAMONDS, CardValue.SEVEN), new Card(Suit.DIAMONDS, CardValue.EIGHT));
+
+        AI_Medium smallK = new AI_Medium("SmallK", withTrumpWeightK(0.5));
+        smallK.setHand(hand);
+        smallK.bet(new BettingContext(Suit.HEARTS, List.of(), 4, false, false, true));
+
+        Hand hand2 = handOf(new Card(Suit.HEARTS, CardValue.ACE), new Card(Suit.HEARTS, CardValue.KING),
+                new Card(Suit.HEARTS, CardValue.QUEEN), new Card(Suit.DIAMONDS, CardValue.TWO),
+                new Card(Suit.DIAMONDS, CardValue.THREE), new Card(Suit.DIAMONDS, CardValue.FOUR),
+                new Card(Suit.DIAMONDS, CardValue.FIVE), new Card(Suit.DIAMONDS, CardValue.SIX),
+                new Card(Suit.DIAMONDS, CardValue.SEVEN), new Card(Suit.DIAMONDS, CardValue.EIGHT));
+        AI_Medium bigK = new AI_Medium("BigK", withTrumpWeightK(5.0));
+        bigK.setHand(hand2);
+        bigK.bet(new BettingContext(Suit.HEARTS, List.of(), 4, false, false, true));
+
+        assertEquals(smallK.getBet(), bigK.getBet());
+    }
+
+    /**
+     * A trump-heavy hand's bet visibly increases as the hand shrinks toward
+     * the dial's bottom of range (numCardsThisRound == 2): same 2-card,
+     * all-trump hand, only trumpWeightK differs (0.0 -- an explicit no-op --
+     * vs. MEDIUM_BALANCED's 0.5 default). Empty priorBets again isolates the
+     * naturalBet term.
+     */
+    @Test
+    public void trumpWeightingVisiblyIncreasesBetOnSmallTrumpHeavyHand() {
+        AI_Medium noWeighting = new AI_Medium("NoWeighting", withTrumpWeightK(0.0));
+        noWeighting.setHand(handOf(new Card(Suit.HEARTS, CardValue.ACE), new Card(Suit.HEARTS, CardValue.KING)));
+        noWeighting.bet(new BettingContext(Suit.HEARTS, List.of(), 4, false, false, true));
+
+        AI_Medium withWeighting = new AI_Medium("WithWeighting", AIPersonality.MEDIUM_BALANCED);
+        withWeighting.setHand(handOf(new Card(Suit.HEARTS, CardValue.ACE), new Card(Suit.HEARTS, CardValue.KING)));
+        withWeighting.bet(new BettingContext(Suit.HEARTS, List.of(), 4, false, false, true));
+
+        assertEquals(2, noWeighting.getBet());
+        assertEquals(3, withWeighting.getBet());
+    }
+
+    /**
+     * Proves the doubles-accumulation requirement: with numHighTrump == 2
+     * and K == 0.25 at a 2-card hand, the multiplier is 1.25, so the bonus
+     * term is numHighTrump * 0.25 == 0.5 -- a fractional contribution that
+     * only survives to affect the final rounded bet if it's accumulated as a
+     * double alongside naturalBet's own int result before any rounding.
+     * A naive implementation that truncated the bonus term to an int on its
+     * own first (i.e. (int) (numHighTrump * multiplier) == (int) 2.5 == 2,
+     * matching naturalBet's own already-int trump contribution) would
+     * silently no-op here -- exactly the K == 0.25 pitfall the design doc's
+     * own worked table (§4.3) flags. The correct, deferred-accumulation
+     * result is a visible +1 bump (naturalBet 2 -> 3), not a no-op.
+     */
+    @Test
+    public void trumpWeightingDefersRoundingToAvoidSwallowingSmallMultipliers() {
+        AI_Medium ai = new AI_Medium("Test", withTrumpWeightK(0.25));
+        ai.setHand(handOf(new Card(Suit.HEARTS, CardValue.KING), new Card(Suit.HEARTS, CardValue.QUEEN)));
+
+        ai.bet(new BettingContext(Suit.HEARTS, List.of(), 4, false, false, true));
+
+        assertEquals(3, ai.getBet());
+    }
 }

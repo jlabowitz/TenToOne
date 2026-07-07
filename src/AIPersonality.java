@@ -20,7 +20,12 @@ public record AIPersonality(
         double recallAccuracy,            // §6.4, inert until item 21
         boolean offSuitTrackingEnabled,   // §6.5, inert until item 21
         double offSuitAccuracyMultiplier, // §6.5, inert until item 21
-        int offSuitRelevanceThreshold     // §6.5, inert until item 21
+        int offSuitRelevanceThreshold,    // §6.5, inert until item 21
+        double voidProgressWeight,        // v2 doc §0.7/§2.7 -- reacting-branch suit-void tiebreak, case 2
+        double cardValueWeight,           // v2 doc §0.7/§2.7 -- reacting-branch suit-void tiebreak, case 2
+        double valueNormalizationScale,   // v2 doc §0.7/§2.7 -- reacting-branch suit-void tiebreak, case 2
+        double trumpWeightK                // v2 doc §0.7/§4.3 -- naturalBet() trump-weighting dial,
+                                            // PLACEHOLDER (needs a real tuning/playtesting pass, see AI_Medium's class doc)
 ) {
     /**
      * Medium tier (design doc §1's tier == 2). Descriptive-not-final
@@ -28,11 +33,18 @@ public record AIPersonality(
      * explicit sign-off, not yet given. These exist to prove the config
      * layer actually changes AI_Medium's behavior (see TestAIMedium), not as
      * a finished personality roster.
+     *
+     * voidProgressWeight/cardValueWeight/valueNormalizationScale (v2 doc
+     * §2.7) and trumpWeightK (v2 doc §4.3) are shared starting values across
+     * all three personalities below -- none of them varies these dials by
+     * personality yet (unlike riskTolerance/opponentBetTrust). trumpWeightK
+     * in particular is an explicit placeholder (0.5): the user has said this
+     * needs a real tuning/playtesting pass later, not a settled value.
      */
     public static final AIPersonality MEDIUM_BALANCED =
-            new AIPersonality("Balanced", 2, 0.5, 0.8, 0, 0.0, false, 0.0, 10);
+            new AIPersonality("Balanced", 2, 0.5, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
     public static final AIPersonality MEDIUM_BOLD =
-            new AIPersonality("Bold", 2, 0.9, 0.8, 0, 0.0, false, 0.0, 10);
+            new AIPersonality("Bold", 2, 0.9, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
     public static final AIPersonality MEDIUM_CAUTIOUS =
-            new AIPersonality("Cautious", 2, 0.1, 0.8, 0, 0.0, false, 0.0, 10);
+            new AIPersonality("Cautious", 2, 0.1, 0.8, 0, 0.0, false, 0.0, 10, 0.5, 1.0, 12.0, 0.5);
 }
