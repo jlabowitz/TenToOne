@@ -14,6 +14,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestGame {
     //AI-only, since the human's name is now captured via the Start Screen
@@ -91,11 +92,29 @@ public class TestGame {
          * that constructs a HeadlessGame would hang forever at construction
          * time waiting on mouseInput.awaitClick(). Canned name mirrors
          * HEADLESS_PLAYER_NAMES' old human-name slot ("You") so existing
-         * assertions keyed on that name don't need to change.
+         * assertions keyed on that name don't need to change. Still used
+         * directly by establishFreshGameState()'s/resumeFromSavedGame()'s own
+         * fallback branches.
          */
         @Override
         String captureHumanName(List<String> aiNames) {
             return "You";
+        }
+
+        /**
+         * ROADMAP item 14: the constructor's primary path now calls this
+         * (not captureHumanName() above) to also offer Resume at boot -- same
+         * hang risk captureHumanName's own override exists to prevent, just
+         * on the newer call site. Always reports a fresh Start Game (never
+         * "resumed"). Delegates to captureHumanName(aiNames) rather than a
+         * second hardcoded "You" literal, so a test subclass that overrides
+         * only captureHumanName (e.g. to supply a distinct canned name) still
+         * gets that name applied via this, the constructor's actual primary
+         * path -- see captureHumanNameOverrideDeterminesHumanPlayerName.
+         */
+        @Override
+        StartScreenOutcome captureStartScreenOutcome(List<String> aiNames, boolean offerResume) {
+            return StartScreenOutcome.name(captureHumanName(aiNames));
         }
     }
 
@@ -185,6 +204,41 @@ public class TestGame {
         Suit trump = Suit.HEARTS;
         int actual = Round.determineTrickWinner(cardsPlayed, trump);
         assertEquals(0, actual);
+    }
+
+    /**
+     * User-reported bug (live playthrough, 2026-07-07), root cause: every
+     * normal fresh game boot -- not just a Menu/Resume round trip --
+     * silently double-registered every Player with the Handler. The
+     * constructor's own declined-Resume/corrupt-snapshot-fallback branches
+     * called establishFreshGameState(), which calls renderPlayers() itself;
+     * play()'s own unconditional first-thing renderPlayers() call then ran a
+     * second time on top of it. Invisible to every other test in this file
+     * because Player.tick()/render() have no logic side effects a JUnit
+     * assertion can observe -- only visible on an actual screen, as doubled/
+     * overlapping HUD text and garbled name rendering. Constructing a
+     * HeadlessGame here already exercises the exact buggy branch (its
+     * captureStartScreenOutcome override always reports a fresh Start Game,
+     * never "resumed"); this reproduces play()'s own call explicitly rather
+     * than actually invoking play() (which blocks forever in its own
+     * game loop).
+     */
+    @Test
+    public void constructorDoesNotDoubleRegisterPlayersBeforePlayCallsRenderPlayers() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Handler handler = game.getHandler();
+        for (Player player : game.getPlayers()) {
+            assertEquals(player.getName() + " must not already be registered before play()'s own "
+                            + "renderPlayers() call runs",
+                    0, handler.object.stream().filter(o -> o == player).count());
+        }
+
+        game.renderPlayers(); // mirrors play()'s own first-thing call
+
+        for (Player player : game.getPlayers()) {
+            assertEquals(player.getName() + " must be registered exactly once after renderPlayers(), not doubled",
+                    1, handler.object.stream().filter(o -> o == player).count());
+        }
     }
 
     /**
@@ -556,6 +610,742 @@ public class TestGame {
 
         assertEquals(Game.WIDTH, rebuiltHuman.getHand().getX());
         assertEquals(Game.HEIGHT - 150, rebuiltHuman.getHand().getY());
+    }
+
+    /**
+     * User-reported bug (live playthrough, 2026-07-07): "closed the game,
+     * then reopened the game and not all my cards show up in my hand." Root
+     * cause -- a process-boot Resume (java Game's main()/run(), the
+     * constructor's captureStartScreenOutcome()-reports-resumed branch) goes
+     * through reconstructFromSnapshot(), which deliberately does NOT call
+     * repositionHumanHand() (see its own doc: that's deferred to play()'s
+     * first-thing renderPlayers() call). But play()'s renderPlayers() call
+     * was never actually followed by a repositionHumanHand() call -- unlike
+     * every other resume path (the Game(GameStateSnapshot) constructor,
+     * resumeFromSavedGame()), which both already do this. Without it, the
+     * human's Hand stays positioned at whatever positionHumanHand() saw
+     * inside Round's reconstruction constructor -- i.e. the player's stale
+     * pre-renderPlayers() (0,0) position -- so Hand.layoutCards()'s
+     * `getX() * i / numCards` places every card at x=0, stacking them
+     * exactly on top of each other. Exercises establishInitialRenderState()
+     * directly (play()'s own extracted one-time render setup) rather than
+     * actually invoking play() (which blocks forever in its own game loop).
+     */
+    @Test
+    public void establishInitialRenderStateRepositionsHumanHandAfterBootTimeResume() throws IOException {
+        Path gameStateFile = Files.createTempFile("tentoone-test-bootresume-gamestate", ".json");
+        GameStateStore preloadStore = new GameStateStore(gameStateFile);
+
+        GameStateSnapshot snapshot = new GameStateSnapshot();
+        snapshot.roundIndex = 0;
+        snapshot.roundStartingPlayer = 0;
+
+        PlayerSnapshot human = new PlayerSnapshot();
+        human.name = "You";
+        human.archetypeId = "human";
+        human.hasBet = true;
+        human.bet = 2;
+        human.hand.add(new CardSnapshot(Suit.HEARTS, CardValue.ACE));
+        human.hand.add(new CardSnapshot(Suit.SPADES, CardValue.TWO));
+        snapshot.players.add(human);
+
+        PlayerSnapshot ai = new PlayerSnapshot();
+        ai.name = "Bot";
+        ai.archetypeId = "ai_easy";
+        ai.hasBet = true;
+        ai.bet = 1;
+        ai.hand.add(new CardSnapshot(Suit.CLUBS, CardValue.KING));
+        ai.hand.add(new CardSnapshot(Suit.DIAMONDS, CardValue.THREE));
+        snapshot.players.add(ai);
+
+        RoundSnapshot round = new RoundSnapshot();
+        round.trumpCard = new CardSnapshot(Suit.HEARTS, CardValue.QUEEN);
+        round.trumpBroken = false;
+        round.currentPlayer = 0;
+        snapshot.round = round;
+
+        preloadStore.save(snapshot);
+
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES) {
+            @Override
+            GameStateStore buildGameStateStore() {
+                return new GameStateStore(gameStateFile);
+            }
+
+            @Override
+            StartScreenOutcome captureStartScreenOutcome(List<String> aiNames, boolean offerResume) {
+                return offerResume ? StartScreenOutcome.resume() : StartScreenOutcome.name(captureHumanName(aiNames));
+            }
+        };
+
+        Player rebuiltHuman = game.getPlayers().get(0);
+        //sanity check: reproduces the bug as it shipped -- right after boot-
+        //time reconstruction and before establishInitialRenderState() runs,
+        //the hand is still at Round reconstruction's stale pre-renderPlayers()
+        //position, not the real on-screen one.
+        assertFalse(Game.WIDTH == rebuiltHuman.getHand().getX());
+
+        game.establishInitialRenderState();
+
+        assertEquals(Game.WIDTH, rebuiltHuman.getHand().getX());
+        assertEquals(Game.HEIGHT - 150, rebuiltHuman.getHand().getY());
+    }
+
+    // --- ROADMAP item 10: hamburger menu (Menu/Restart/Resume) ---
+
+    /**
+     * Acceptance criterion 3 (Restart confirmation, part 1): selecting
+     * Restart from the hamburger menu and clicking Yes must propagate a
+     * RestartGameSignal all the way out of Human.bet() -- proving the "two
+     * clicks" contract is really wired end-to-end (HamburgerMenu's own
+     * confirmation-requires-a-second-click behavior is unit-tested directly
+     * in TestHamburgerMenu; this exercises the real Human/Game wiring on top
+     * of it).
+     */
+    @Test(timeout = 5000)
+    public void restartSelectionFromHamburgerMenuPropagatesRestartGameSignalOnlyAfterConfirmation() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Human human = (Human) game.getPlayers().get(0);
+        Hand hand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        hand.addCard(new Card(Suit.HEARTS, CardValue.ACE));
+        human.setHand(hand);
+        MouseInput mouseInput = game.getMouseInput();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 20, 20); // hamburger icon (BetStepper's hotspot)
+            // HamburgerMenu.showBlocking() clears the click queue again on
+            // entry (same nested-dialog clearClicks() every showBlocking
+            // view in this codebase does) -- a short pause avoids a race
+            // where this thread's next click gets queued and then wiped by
+            // that clearClicks() before the nested loop starts awaiting it.
+            sleep50();
+            deliverClick(mouseInput, 130, 35); // Restart (row 1, col 1: index 4, x=[120,220), y=[29,47))
+            sleep50();
+            deliverClick(mouseInput, 150, 25); // Yes
+        });
+        clicker.start();
+
+        try {
+            human.bet(new BettingContext(Suit.HEARTS, List.of(), 2, true, false, true));
+            fail("expected RestartGameSignal to propagate out of bet()");
+        } catch (RestartGameSignal expected) {
+            // expected
+        }
+        clicker.join();
+    }
+
+    /**
+     * Acceptance criterion 3 (Restart confirmation, part 2): once confirmed,
+     * abandonAndRestart() must reset currentWinStreak to 0 and persist it
+     * (verified indirectly -- SaveStore's own save()/load() round-trip is
+     * already covered by TestSaveStore) while leaving gamesPlayed/gamesWon/
+     * highScore/every achievement-unlock state untouched (this is an
+     * abandoned game, not a finished one -- AchievementEngine.checkGameEnd
+     * must not run), and must clear the resumable save. Existing tests
+     * around restartForNewGame()/AchievementEngine.checkGameEnd/the natural
+     * Play-Again flow are unmodified elsewhere in this file and stay green.
+     */
+    @Test
+    public void abandonAndRestartResetsWinStreakOnlyNotGamesPlayedOrAchievements() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        SaveData saveData = game.getSaveData();
+        saveData.currentWinStreak = 5;
+        saveData.gamesPlayed = 3;
+        saveData.gamesWon = 2;
+        saveData.highScore = 80;
+        saveData.unlock(Achievement.FIRST_VICTORY);
+
+        game.saveGameStateCheckpoint();
+        assertTrue("a checkpoint save must make hasResumableGame() true", game.hasResumableGame());
+
+        game.abandonAndRestart();
+
+        assertEquals("currentWinStreak must reset to 0", 0, saveData.currentWinStreak);
+        assertEquals("gamesPlayed must be untouched -- this is an abandoned game, not a finished one",
+                3, saveData.gamesPlayed);
+        assertEquals("gamesWon must be untouched", 2, saveData.gamesWon);
+        assertEquals("highScore must be untouched", 80, saveData.highScore);
+        assertTrue("existing achievement unlocks must be untouched", saveData.isUnlocked(Achievement.FIRST_VICTORY));
+        assertFalse("abandonAndRestart() must clear the resumable save", game.hasResumableGame());
+    }
+
+    /**
+     * Regression test for a bug found via this item's own manual
+     * verification pass (not caught by any other automated test): confirming
+     * Restart while a round was genuinely in progress used to leave Game's
+     * currentRound field pointing at the just-abandoned Round -- restartForNewGame()
+     * resets every player's state (including nulling each player's Hand) but
+     * was never responsible for nulling currentRound, since before this item
+     * it was only ever reachable once a round had already finished normally.
+     * Left unfixed, the next playOneRound() call's resume-aware
+     * currentRound == null check would treat that stale Round as still in
+     * progress and call Round.bet() on players whose hands had just been
+     * reset to null -- an NPE (confirmed live: AI_Medium.bet() ->
+     * getHand().getNumCards() on a null Hand).
+     */
+    @Test
+    public void abandonAndRestartNullsOutCurrentRoundEvenWhenRestartedMidRound() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        List<Player> players = game.getPlayers();
+        for (Player player : players) {
+            Hand hand = new Hand(Game.WIDTH, Game.HEIGHT, player.getID());
+            hand.addCard(new Card(Suit.HEARTS, CardValue.ACE));
+            player.setHand(hand);
+        }
+
+        // a genuinely in-progress round on this live Game instance --
+        // simulates "Restart confirmed while a round was still in progress"
+        // (exactly what exposed this bug).
+        Round round = new Round(1, players, 0, Game.WIDTH, Game.HEIGHT, game.getHandler());
+        game.setCurrentRoundForTest(round);
+        assertTrue("test setup must leave a genuinely in-progress round", game.getCurrentRound() != null);
+
+        game.abandonAndRestart();
+
+        assertNull("abandonAndRestart() must null out currentRound -- otherwise the next "
+                        + "playOneRound() call would treat a stale Round (whose players' hands "
+                        + "were just reset to null by restartForNewGame()) as still in progress",
+                game.getCurrentRound());
+    }
+
+    /**
+     * Regression test for the second bug found via this item's manual
+     * verification pass: cleanupHandlerForMenuOrRestart() removes every
+     * player from the Handler, but restartForNewGame() (reused unmodified by
+     * abandonAndRestart()) never re-adds them, since it was only ever
+     * reachable before this item via the natural Play-Again flow, which
+     * never removes players from the Handler in the first place. Left
+     * unfixed, a mid-round Restart left every player permanently
+     * deregistered -- still fully functional as game-logic objects, but
+     * invisible on screen (no HUD text/name/score rendered) for the rest of
+     * the session.
+     */
+    @Test
+    public void abandonAndRestartReRegistersPlayersWithTheHandler() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Handler handler = game.getHandler();
+        List<Player> players = game.getPlayers();
+        game.renderPlayers(); // normally done once by play(); this test drives abandonAndRestart() directly instead
+
+        for (Player player : players) {
+            assertTrue("test setup: every player must start registered with the handler",
+                    handler.object.contains(player));
+        }
+
+        game.abandonAndRestart();
+
+        for (Player player : players) {
+            assertTrue("player " + player.getName() + " must be re-registered with the handler after "
+                            + "abandonAndRestart(), or it silently stops rendering/ticking for the rest of the session",
+                    handler.object.contains(player));
+        }
+    }
+
+    /**
+     * Code-review Finding 2: the same Handler re-registration bug class
+     * abandonAndRestartReRegistersPlayersWithTheHandler proves fixed for the
+     * Restart path had no dedicated regression test for the Menu -> fresh
+     * Start Game path (establishFreshGameState(), reached when the player
+     * picks Menu then declines Resume in favor of a fresh name/Start Game).
+     * cleanupHandlerForMenuOrRestart() removes the old players from the
+     * Handler the same way it does before a Restart; establishFreshGameState()
+     * builds a brand-new player list and must register every one of them via
+     * renderPlayers() at its end, or they'd be fully functional game-logic
+     * objects that silently never render/tick again.
+     */
+    @Test
+    public void establishFreshGameStateRegistersNewPlayersWithTheHandler() {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Handler handler = game.getHandler();
+        // Bug fix (user-reported, live playthrough): the constructor itself
+        // no longer registers players (that used to double-register every
+        // player, stacked with play()'s own first-thing renderPlayers()
+        // call) -- normally done once by play(); this test drives
+        // establishFreshGameState()/cleanup directly instead, same
+        // convention abandonAndRestartReRegistersPlayersWithTheHandler above
+        // already uses.
+        game.renderPlayers();
+        List<Player> oldPlayers = new ArrayList<>(game.getPlayers());
+
+        for (Player player : oldPlayers) {
+            assertTrue("test setup: every player must start registered with the handler",
+                    handler.object.contains(player));
+        }
+
+        game.cleanupHandlerForMenuOrRestart();
+        for (Player player : oldPlayers) {
+            assertFalse("test setup: cleanup must actually deregister the old players first",
+                    handler.object.contains(player));
+        }
+
+        game.establishFreshGameState("Fresh Name");
+
+        List<Player> newPlayers = game.getPlayers();
+        assertEquals(2, newPlayers.size());
+        assertEquals("Fresh Name", newPlayers.get(0).getName());
+        for (Player player : newPlayers) {
+            assertTrue("player " + player.getName() + " must be registered with the handler after "
+                            + "establishFreshGameState(), or it silently stops rendering/ticking for the rest of the session",
+                    handler.object.contains(player));
+        }
+    }
+
+    /**
+     * Acceptance criterion 2 (Menu -> Resume round-trip), part 1: selecting
+     * Menu must checkpoint the in-progress state (Human/Game's own
+     * onReturnToMenu wiring) before propagating ReturnToMenuSignal out of
+     * Human.bet() -- mirrors the RestartGameSignal wiring test above.
+     */
+    @Test(timeout = 5000)
+    public void menuSelectionFromHamburgerMenuCheckpointsThenPropagatesReturnToMenuSignal() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Human human = (Human) game.getPlayers().get(0);
+        Hand hand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        hand.addCard(new Card(Suit.HEARTS, CardValue.ACE));
+        human.setHand(hand);
+        MouseInput mouseInput = game.getMouseInput();
+
+        assertFalse("no checkpoint should exist before Menu is clicked", game.hasResumableGame());
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 20, 20); // hamburger icon
+            // see the Restart-confirmation test's identical comment above --
+            // HamburgerMenu.showBlocking()'s own nested clearClicks() races
+            // against this thread without a short pause here.
+            sleep50();
+            deliverClick(mouseInput, 30, 35); // Menu (row 1, col 0: index 3, x=[20,120), y=[29,47))
+        });
+        clicker.start();
+
+        try {
+            human.bet(new BettingContext(Suit.HEARTS, List.of(), 2, true, false, true));
+            fail("expected ReturnToMenuSignal to propagate out of bet()");
+        } catch (ReturnToMenuSignal expected) {
+            // expected
+        }
+        clicker.join();
+
+        assertTrue("Menu must checkpoint before throwing, so a resumable save exists", game.hasResumableGame());
+    }
+
+    /**
+     * Acceptance criterion 2 (Menu -> Resume round-trip), part 2: once a
+     * checkpoint exists and the stale player/hand registrations have been
+     * cleaned up (play()'s own catch-block sequence, exercised directly here
+     * since this test drives the pieces individually rather than the whole
+     * play() loop), resumeFromSavedGame() must rebuild players/hands/bets/
+     * scores/round bookkeeping matching the checkpointed state, and must not
+     * leave any player double-registered with the Handler (each resumed
+     * Player instance must appear exactly once in the handler's live object
+     * list -- a double-registration would silently double every per-frame
+     * tick()/render() call for that player).
+     */
+    @Test
+    public void resumeFromSavedGameRestoresStateWithoutDuplicatePlayerRegistration() throws GameStateReconstructionException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Player human = game.getPlayers().get(0);
+        Player bot = game.getPlayers().get(1);
+
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.HEARTS, CardValue.KING));
+        human.setHand(humanHand);
+        human.increaseScore(15);
+
+        Hand botHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        botHand.addCard(new Card(Suit.CLUBS, CardValue.TWO));
+        bot.setHand(botHand);
+        bot.setBet(2);
+        bot.increaseScore(9);
+
+        game.saveGameStateCheckpoint();
+        assertTrue(game.hasResumableGame());
+
+        // mirrors play()'s own ReturnToMenuSignal catch-block cleanup step,
+        // exercised directly here since this test drives the pieces
+        // individually rather than the whole play() loop.
+        game.cleanupHandlerForMenuOrRestart();
+
+        game.resumeFromSavedGame();
+
+        List<Player> resumedPlayers = game.getPlayers();
+        assertEquals(2, resumedPlayers.size());
+
+        Player resumedHuman = resumedPlayers.get(0);
+        assertEquals(ID.HUMAN, resumedHuman.getID());
+        assertEquals(15, resumedHuman.getScore());
+        assertEquals(1, resumedHuman.getHand().getNumCards());
+
+        Player resumedBot = resumedPlayers.get(1);
+        assertEquals(9, resumedBot.getScore());
+        assertTrue(resumedBot.hasBet());
+        assertEquals(2, resumedBot.getBet());
+        assertEquals(1, resumedBot.getHand().getNumCards());
+
+        for (Player player : resumedPlayers) {
+            long registrationCount = game.getHandler().object.stream().filter(o -> o == player).count();
+            assertEquals("player " + player.getName() + " must be registered exactly once, not doubled",
+                    1, registrationCount);
+        }
+    }
+
+    /**
+     * User-reported bug (live playthrough, 2026-07-07): after Menu -> Resume
+     * mid-trick, playing one more card left TWO players simultaneously
+     * showing the trick-leader dot, and the human's "Led:" HUD line rendered
+     * doubled/garbled. Reproduces the exact mid-trick-resume shape (one
+     * player already played this trick, the other -- the human -- has the
+     * single remaining play) and checks trickLeader ends up on exactly the
+     * real winner, not left stuck on the trick's original leader too.
+     */
+    @Test(timeout = 5000)
+    public void resumingMidTrickThenCompletingItLeavesExactlyOneTrickLeader() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Player human = game.getPlayers().get(0);
+        Player bot = game.getPlayers().get(1);
+
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.HEARTS, CardValue.SEVEN)); // trump -- guaranteed to win over Bot's plain lead
+        human.setHand(humanHand);
+
+        Hand botHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        bot.setHand(botHand); // already played its only remaining card this trick
+
+        List<Player> players = game.getPlayers();
+        List<SeatCardPlay> alreadyPlayed = List.of(new SeatCardPlay(1, new CardSnapshot(Suit.DIAMONDS, CardValue.TWO)));
+        Trick trick = new Trick(players, 1, 0, Suit.HEARTS, false, Suit.DIAMONDS, alreadyPlayed,
+                Game.WIDTH, Game.HEIGHT, game.getHandler());
+        Round round = new Round(1, players, 1, Game.WIDTH, Game.HEIGHT, game.getHandler(),
+                new Card(Suit.HEARTS, CardValue.KING), Suit.HEARTS, false);
+        round.setCurrentTrick(trick);
+        game.setCurrentRoundForTest(round);
+
+        // Bot led (seat 1) -- initializeTrickLeader() (inside the Round
+        // constructor above) already marked it; confirm before driving the
+        // rest of the trick, so a failure below is attributable to
+        // playRound()'s post-trick transition, not to setup.
+        assertTrue("test setup: Bot must start as trick leader", bot.isTrickLeader());
+        assertFalse("test setup: Human must not start as trick leader", human.isTrickLeader());
+
+        game.saveGameStateCheckpoint();
+        game.cleanupHandlerForMenuOrRestart();
+        game.resumeFromSavedGame();
+
+        Player resumedHuman = game.getPlayers().get(0);
+        Player resumedBot = game.getPlayers().get(1);
+        MouseInput mouseInput = game.getMouseInput();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 30, (int) resumedHuman.getY()); // resumedHuman's single hand card, leftmost (only) slot
+            // Trick.play()'s own trailing getPlayer(0).nextTrick() call blocks
+            // on a second, separate "click anywhere to continue" -- without
+            // this, playRound() never returns and the test hangs.
+            sleep50();
+            deliverClick(mouseInput, 400, 300);
+        });
+        clicker.start();
+        game.getCurrentRound().playRound();
+        clicker.join();
+
+        assertTrue("Human must have actually won the trick (played trump over Bot's plain lead)",
+                resumedHuman.getTrickScore() == 1);
+        assertFalse("Bot (the trick's original leader) must be cleared once the trick resolves to a different winner",
+                resumedBot.isTrickLeader());
+        assertTrue("Human (the actual winner) must be marked trick leader",
+                resumedHuman.isTrickLeader());
+    }
+
+    /**
+     * User-reported bug, take 2: the single-trick repro above passed, so this
+     * tests the shape that repro couldn't -- resuming BETWEEN tricks (not
+     * mid-trick) with more than one trick still remaining, and the human NOT
+     * seated last in turn order, so a second trick plays out automatically
+     * within the same playRound() call after the human's one click. Hands are
+     * rigged (via forced suit-following, everyone down to at most one legal
+     * card per turn) so both tricks' winners are fully deterministic
+     * regardless of AI's own choice among any legal cards it does have:
+     * Bot2 leads and wins trick A (leader == winner, the case that can't
+     * expose a stale-leader bug), then Bot2 leads trick B again but Human
+     * -- forced onto its last card, a trump -- wins it (leader != winner,
+     * the case that can).
+     */
+    @Test(timeout = 5000)
+    public void resumingBetweenTricksThenPlayingASecondTrickLeavesExactlyOneTrickLeader() throws InterruptedException {
+        Game game = new HeadlessGame(List.of("Bot1", "Bot2"));
+        Player human = game.getPlayers().get(0);
+        Player bot1 = game.getPlayers().get(1);
+        Player bot2 = game.getPlayers().get(2);
+
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.DIAMONDS, CardValue.TWO));
+        humanHand.addCard(new Card(Suit.SPADES, CardValue.THREE)); // trump
+        human.setHand(humanHand);
+
+        Hand bot1Hand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        bot1Hand.addCard(new Card(Suit.DIAMONDS, CardValue.FIVE));
+        bot1Hand.addCard(new Card(Suit.CLUBS, CardValue.FOUR));
+        bot1.setHand(bot1Hand);
+
+        Hand bot2Hand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        bot2Hand.addCard(new Card(Suit.DIAMONDS, CardValue.ACE));
+        bot2Hand.addCard(new Card(Suit.DIAMONDS, CardValue.KING));
+        bot2.setHand(bot2Hand);
+
+        List<Player> players = game.getPlayers();
+        // Between tricks (currentTrick left null): Bot2 (seat 2) leads the next trick.
+        Round round = new Round(2, players, 2, Game.WIDTH, Game.HEIGHT, game.getHandler(),
+                new Card(Suit.SPADES, CardValue.KING), Suit.SPADES, false);
+        game.setCurrentRoundForTest(round);
+        assertTrue("test setup: Bot2 must lead (and thus start as trick leader for) the next trick", bot2.isTrickLeader());
+
+        game.saveGameStateCheckpoint();
+        game.cleanupHandlerForMenuOrRestart();
+        game.resumeFromSavedGame();
+
+        Player resumedHuman = game.getPlayers().get(0);
+        Player resumedBot1 = game.getPlayers().get(1);
+        Player resumedBot2 = game.getPlayers().get(2);
+        MouseInput mouseInput = game.getMouseInput();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 0, (int) resumedHuman.getY()); // trick A: forced TWO of DIAMONDS (index 0)
+            sleep50();
+            deliverClick(mouseInput, 400, 300); // trick A: dismiss "click anywhere to continue"
+            sleep50();
+            deliverClick(mouseInput, 0, (int) resumedHuman.getY()); // trick B: forced THREE of SPADES (only card left, index 0)
+            sleep50();
+            deliverClick(mouseInput, 400, 300); // trick B: dismiss "click anywhere to continue"
+        });
+        clicker.start();
+        game.getCurrentRound().playRound();
+        clicker.join();
+
+        assertEquals("test setup: Bot2 (with two diamonds, both beating everyone else's) must have won trick A",
+                1, resumedBot2.getTrickScore());
+        assertEquals("Human's forced trump on trick B must have won it over Bot2's plain diamond lead",
+                1, resumedHuman.getTrickScore());
+
+        assertFalse("Bot2 led trick B but lost it -- must not still show as trick leader", resumedBot2.isTrickLeader());
+        assertFalse("Bot1 never led or won anything -- must never show as trick leader", resumedBot1.isTrickLeader());
+        assertTrue("Human actually won the last trick (trick B) -- must be the one shown as trick leader",
+                resumedHuman.isTrickLeader());
+    }
+
+    /**
+     * User-reported bug, take 3: mirrors the exact seat composition and
+     * leader/winner pair from the user's own screenshot (5 total players --
+     * human + Medium Balanced/Bold/Cautious + Easy -- with Easy leading and
+     * Medium Cautious ending up the actual winner, the same two seats that
+     * both showed a trick-leader dot in the bug report) in case the earlier,
+     * smaller-player-count repros missed a wraparound-specific issue.
+     */
+    @Test(timeout = 5000)
+    public void resumingBetweenTricksWithFivePlayersMatchesBugReportSeatsExactly() throws InterruptedException {
+        Game game = new HeadlessGame(List.of("Medium Balanced", "Medium Bold", "Medium Cautious", "Easy"));
+        Player human = game.getPlayers().get(0);
+        Player balanced = game.getPlayers().get(1);
+        Player bold = game.getPlayers().get(2);
+        Player cautious = game.getPlayers().get(3);
+        Player easy = game.getPlayers().get(4);
+
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.CLUBS, CardValue.TWO));
+        human.setHand(humanHand);
+
+        Hand balancedHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        balancedHand.addCard(new Card(Suit.CLUBS, CardValue.THREE));
+        balanced.setHand(balancedHand);
+
+        Hand boldHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        boldHand.addCard(new Card(Suit.CLUBS, CardValue.FOUR));
+        bold.setHand(boldHand);
+
+        Hand cautiousHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        cautiousHand.addCard(new Card(Suit.SPADES, CardValue.FIVE)); // trump, void of the led suit
+        cautious.setHand(cautiousHand);
+
+        Hand easyHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        easyHand.addCard(new Card(Suit.CLUBS, CardValue.TEN));
+        easy.setHand(easyHand);
+
+        List<Player> players = game.getPlayers();
+        // Between tricks (currentTrick left null): Easy (seat 4) leads the next trick.
+        Round round = new Round(1, players, 4, Game.WIDTH, Game.HEIGHT, game.getHandler(),
+                new Card(Suit.SPADES, CardValue.KING), Suit.SPADES, false);
+        game.setCurrentRoundForTest(round);
+        assertTrue("test setup: Easy must lead (and thus start as trick leader for) the next trick", easy.isTrickLeader());
+
+        game.saveGameStateCheckpoint();
+        game.cleanupHandlerForMenuOrRestart();
+        game.resumeFromSavedGame();
+
+        List<Player> resumed = game.getPlayers();
+        Player resumedHuman = resumed.get(0);
+        Player resumedCautious = resumed.get(3);
+        Player resumedEasy = resumed.get(4);
+        MouseInput mouseInput = game.getMouseInput();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 0, (int) resumedHuman.getY()); // Human's single card (index 0), turn order: Easy -> Human -> Balanced -> Bold -> Cautious
+            sleep50();
+            deliverClick(mouseInput, 400, 300); // dismiss "click anywhere to continue"
+        });
+        clicker.start();
+        game.getCurrentRound().playRound();
+        clicker.join();
+
+        assertEquals("test setup: Medium Cautious's trump must have won over everyone else's plain clubs",
+                1, resumedCautious.getTrickScore());
+
+        for (Player player : resumed) {
+            if (player == resumedCautious) {
+                assertTrue("Medium Cautious actually won -- must be the one shown as trick leader",
+                        player.isTrickLeader());
+            } else {
+                assertFalse(player.getName() + " did not win this trick -- must not show a trick-leader dot",
+                        player.isTrickLeader());
+            }
+        }
+        assertFalse("Easy led but lost -- must not still show as trick leader (this is the bug's exact reported symptom)",
+                resumedEasy.isTrickLeader());
+    }
+
+    /**
+     * User-reported bug, take 4: the case none of the earlier repros
+     * covered -- Menu clicked exactly during Human.nextTrick()'s "click
+     * anywhere to continue" prompt, i.e. every player has ALREADY played
+     * this trick (hands already reduced, cardsPlayedBySeat already has one
+     * entry per player) and only the trick's bookkeeping/dismissal remains.
+     * At checkpoint time Round.playRound()'s post-trick code (winner
+     * determination, trickLeader clear/set, currentPlayer update) has NOT
+     * run yet for this trick -- it only runs after currentTrick.play()
+     * returns, which is blocked on this exact prompt.
+     */
+    @Test(timeout = 5000)
+    public void resumingATrickThatWasFullyPlayedButNotYetResolvedStillPlaysTheFinalTrick() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Player human = game.getPlayers().get(0);
+        Player bot = game.getPlayers().get(1);
+
+        // Both players' hands already reflect this trick's card being played
+        // -- one card left each, for the round's real final trick. Human
+        // leads that final trick (see the actualWinner=0 computation below)
+        // with the higher remaining diamond, so Human -- not Bot -- also
+        // wins it; keeps this test's assertions about who ends up shown as
+        // trick leader unambiguous (a single, consistent winner across both
+        // tricks) rather than incidentally exercising a second, different
+        // leader transition this test isn't about.
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.DIAMONDS, CardValue.FOUR));
+        human.setHand(humanHand);
+
+        Hand botHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        botHand.addCard(new Card(Suit.DIAMONDS, CardValue.THREE));
+        bot.setHand(botHand);
+
+        List<Player> players = game.getPlayers();
+        List<SeatCardPlay> alreadyPlayed = List.of(
+                new SeatCardPlay(1, new CardSnapshot(Suit.DIAMONDS, CardValue.TWO)),   // Bot led
+                new SeatCardPlay(0, new CardSnapshot(Suit.HEARTS, CardValue.SEVEN))    // Human trumped in, both already played
+        );
+        Trick trick = new Trick(players, 1, 0, Suit.HEARTS, false, Suit.DIAMONDS, alreadyPlayed,
+                Game.WIDTH, Game.HEIGHT, game.getHandler());
+        Round round = new Round(2, players, 1, Game.WIDTH, Game.HEIGHT, game.getHandler(),
+                new Card(Suit.HEARTS, CardValue.KING), Suit.HEARTS, false);
+        round.setCurrentTrick(trick);
+        game.setCurrentRoundForTest(round);
+
+        game.saveGameStateCheckpoint();
+        game.cleanupHandlerForMenuOrRestart();
+        game.resumeFromSavedGame();
+
+        Player resumedHuman = game.getPlayers().get(0);
+        Player resumedBot = game.getPlayers().get(1);
+        MouseInput mouseInput = game.getMouseInput();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 400, 300); // dismiss the interrupted "click anywhere to continue" prompt
+            sleep50();
+            deliverClick(mouseInput, 0, (int) resumedHuman.getY()); // the round's real final trick: resumedHuman's one remaining card
+            sleep50();
+            deliverClick(mouseInput, 400, 300); // dismiss that trick's own "click anywhere to continue"
+        });
+        clicker.start();
+        game.getCurrentRound().playRound();
+        clicker.join();
+
+        assertEquals("Human must win both the already-played trick (trump) and the round's real final "
+                        + "trick (higher diamond, led once currentPlayer correctly advanced) -- both must "
+                        + "be recorded as trick wins",
+                2, resumedHuman.getTrickScore());
+        assertEquals("Bot must not have won either trick", 0, resumedBot.getTrickScore());
+        assertFalse("Bot never won a trick -- must not show as trick leader",
+                resumedBot.isTrickLeader());
+        assertTrue("Human won the last trick played -- must be shown as trick leader",
+                resumedHuman.isTrickLeader());
+
+        assertEquals("the round's real final trick must actually be played, not silently skipped -- "
+                        + "Human's hand must end up empty",
+                0, resumedHuman.getHand().getNumCards());
+        assertEquals("Bot's hand must also end up empty once the final trick is actually played",
+                0, resumedBot.getHand().getNumCards());
+    }
+
+    /**
+     * Acceptance criterion 4 (Settings toggle): drives the real hamburger
+     * menu -> Settings -> toggle -> Back sequence through Human.bet()'s
+     * actual click loop (not a direct SettingsView.showBlocking call, which
+     * TestSettingsView already covers in isolation) and confirms the flip is
+     * visible on game.getGameSettings() -- the exact same instance
+     * Game.playOneRound() passes into every Round.bet() call. If Human's own
+     * internal gameSettings field were ever a disconnected copy instead of
+     * the same reference Game holds, this test would fail even though
+     * TestSettingsView's own direct test would still pass.
+     */
+    @Test(timeout = 5000)
+    public void settingsToggleFromHamburgerMenuMutatesTheSameGameSettingsInstanceGameUses() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Human human = (Human) game.getPlayers().get(0);
+        Hand hand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        hand.addCard(new Card(Suit.HEARTS, CardValue.ACE));
+        human.setHand(hand);
+        MouseInput mouseInput = game.getMouseInput();
+
+        assertTrue("default is ON per GameSettings' own doc", game.getGameSettings().totalBetsCannotEqualTricks);
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 20, 20); // hamburger icon
+            sleep50();
+            deliverClick(mouseInput, 230, 20); // Settings (row 0, col 2: index 2, x=[220,320), y=[11,29))
+            sleep50();
+            deliverClick(mouseInput, 550, 135); // the toggle
+            sleep50();
+            deliverClick(mouseInput, 700, 590); // Back
+            sleep50();
+            deliverClick(mouseInput, 760, 600); // finish the bet (Bet button, value 0)
+        });
+        clicker.start();
+
+        human.bet(new BettingContext(Suit.HEARTS, List.of(), 2, true, false, true));
+        clicker.join();
+
+        assertFalse("toggling Settings via the hamburger menu must mutate the exact GameSettings "
+                        + "instance Game.playOneRound() passes into every Round.bet() call",
+                game.getGameSettings().totalBetsCannotEqualTricks);
+    }
+
+    private static void sleep50() {
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** Synthesizes a left-click MouseEvent and delivers it straight to mouseInput's listener, same as an AWT click would. */

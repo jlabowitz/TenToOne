@@ -27,6 +27,21 @@ public class Human extends Player{
     private final Runnable checkpointSaver;
 
     /**
+     * ROADMAP item 10 (hamburger menu): gameSettings is read by the Settings
+     * item (SettingsView.showBlocking mutates it directly); onReturnToMenu/
+     * onRestartConfirmed are Game-owned callbacks invoked by
+     * handleHamburgerMenu() below for the Menu/Restart-confirmed items --
+     * both are expected to throw an unchecked signal (ReturnToMenuSignal/
+     * RestartGameSignal respectively) that unwinds up to Game.play()'s own
+     * outer loop; see those classes' docs. Plain Runnables, same reasoning as
+     * checkpointSaver's own doc above -- no dedicated functional interface
+     * needed for a zero-arg "do the thing" callback.
+     */
+    private final GameSettings gameSettings;
+    private final Runnable onReturnToMenu;
+    private final Runnable onRestartConfirmed;
+
+    /**
      * Convenience overload for callers that don't need checkpoint saves
      * (every existing test, and any future non-gameplay construction) --
      * delegates to the 6-arg constructor with a no-op callback.
@@ -35,14 +50,31 @@ public class Human extends Player{
         this(name, mouseInput, handler, achievementToast, saveData, () -> {});
     }
 
+    /**
+     * Convenience overload for callers that don't need the hamburger-menu
+     * collaborators (every existing test predating ROADMAP item 10) --
+     * delegates to the full constructor with a fresh default GameSettings and
+     * no-op Menu/Restart callbacks, same "extend the existing convenience-
+     * overload pattern" this class already established for checkpointSaver.
+     */
     public Human(String name, MouseInput mouseInput, Handler handler, AchievementToast achievementToast,
                  SaveData saveData, Runnable checkpointSaver) {
+        this(name, mouseInput, handler, achievementToast, saveData, checkpointSaver,
+                new GameSettings(), () -> {}, () -> {});
+    }
+
+    public Human(String name, MouseInput mouseInput, Handler handler, AchievementToast achievementToast,
+                 SaveData saveData, Runnable checkpointSaver, GameSettings gameSettings,
+                 Runnable onReturnToMenu, Runnable onRestartConfirmed) {
         super(name);
         this.mouseInput = mouseInput;
         this.handler = handler;
         this.achievementToast = achievementToast;
         this.saveData = saveData;
         this.checkpointSaver = checkpointSaver;
+        this.gameSettings = gameSettings;
+        this.onReturnToMenu = onReturnToMenu;
+        this.onRestartConfirmed = onRestartConfirmed;
         id = ID.HUMAN;
     }
 
@@ -90,6 +122,11 @@ public class Human extends Player{
                 }
                 if (stepper.isAchievementsHotspot(click.x, click.y)) {
                     AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
+                    mouseInput.clearClicks();
+                    continue;
+                }
+                if (stepper.isHamburgerHotspot(click.x, click.y)) {
+                    handleHamburgerMenu();
                     mouseInput.clearClicks();
                     continue;
                 }
@@ -169,6 +206,11 @@ public class Human extends Player{
                     mouseInput.clearClicks();
                     continue;
                 }
+                if (feedback.isHamburgerHotspot(click.x, click.y)) {
+                    handleHamburgerMenu();
+                    mouseInput.clearClicks();
+                    continue;
+                }
                 Card card = getHand().cardAt(click.x, click.y);
                 if (card == null) {
                     continue;
@@ -235,6 +277,11 @@ public class Human extends Player{
                     mouseInput.clearClicks();
                     continue;
                 }
+                if (prompt.isHamburgerHotspot(click.x, click.y)) {
+                    handleHamburgerMenu();
+                    mouseInput.clearClicks();
+                    continue;
+                }
                 break;
             }
         } finally {
@@ -242,5 +289,50 @@ public class Human extends Player{
         }
         // design/persistent-game-state.md Phase 7: right after the click-loop resolves.
         checkpointSaver.run();
+    }
+
+    /**
+     * ROADMAP item 10: shared dispatch for the hamburger menu, called
+     * identically from all three of this class's blocking click-loops
+     * (bet/playCard/nextTrick) once a hamburger-hotspot click is detected --
+     * extracted here rather than tripled, unlike the small per-loop Rules/
+     * Achievements checks above (those stayed inline, matching this
+     * codebase's existing duplication convention for tiny one-line hotspot
+     * checks; this dispatch is bigger and has real branching, so it's pulled
+     * out once instead).
+     *
+     * MENU and RESTART (once confirmed by HamburgerMenu itself) invoke
+     * Game-owned callbacks that are expected to throw an unchecked signal
+     * (ReturnToMenuSignal/RestartGameSignal) -- this method does not catch
+     * either; they propagate straight up through bet()/playCard()/
+     * nextTrick()'s own try/finally blocks (running those methods' finally
+     * cleanup along the way) to Game.play()'s own outer loop. See
+     * ReturnToMenuSignal/RestartGameSignal's own docs.
+     */
+    private void handleHamburgerMenu() {
+        HamburgerMenu.Selection selection = HamburgerMenu.showBlocking(handler, mouseInput, achievementToast);
+        if (selection == null) {
+            return;
+        }
+        switch (selection) {
+            case RULES:
+                RulesView.showBlocking(handler, mouseInput, achievementToast);
+                break;
+            case ACHIEVEMENTS:
+                AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
+                break;
+            case SETTINGS:
+                SettingsView.showBlocking(handler, mouseInput, achievementToast, gameSettings);
+                break;
+            case PAUSE:
+                PauseView.showBlocking(handler, mouseInput, achievementToast);
+                break;
+            case MENU:
+                onReturnToMenu.run();
+                break;
+            case RESTART:
+                onRestartConfirmed.run();
+                break;
+        }
     }
 }

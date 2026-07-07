@@ -54,6 +54,36 @@ public class BetStepper extends GameObject {
     private static final int ACHIEVEMENTS_TOP = 265, ACHIEVEMENTS_BOTTOM = 295;
     private static final int ACHIEVEMENTS_LEFT = 600, ACHIEVEMENTS_RIGHT = 730;
 
+    // ROADMAP item 10, moved to the very top of the canvas per user feedback
+    // (was y=[60,90)): hamburger-menu icon, top-left corner -- duplicated
+    // (not shared) across BetStepper/IllegalPlayFeedback/NextTrickPrompt,
+    // mirroring this codebase's own established convention of each of those
+    // three classes independently rendering+hit-testing its own Rules/
+    // Achievements hotspot boxes.
+    //
+    // HAMBURGER_TOP/BOTTOM=[5,35) clears the AI seat row (Game.AI_ROW_Y=70,
+    // shifted down from 50 for exactly this reason -- see that field's own
+    // doc for the full derivation and TestHamburgerIconGeometry for the
+    // algebraic proof across every supported player count) with real margin
+    // to spare.
+    //
+    // Known, accepted trade-off (not covered by TestHamburgerIconGeometry's
+    // required AI-seat/trump-card proof, since it's a different kind of
+    // conflict): this now sits *inside* AchievementToast's own click-to-
+    // dismiss band (y in [0,50), full canvas width -- see that class's
+    // TOAST_BAND_BOTTOM). While an achievement toast is actively showing (at
+    // most a few seconds per unlock), a click on this icon is consumed as a
+    // toast-dismiss instead of opening the menu -- every showBlocking loop in
+    // this codebase already checks the toast hotspot first, so this is a
+    // harmless "click again" quirk (confirmed: the same click also dismisses
+    // the toast, so the very next click on the icon opens the menu normally),
+    // not a dead end. This is unavoidable without either shrinking the toast
+    // band or moving the icon somewhere other than the user-specified
+    // top-left corner -- flagged in this item's completion report as a
+    // judgment call, not silently patched over.
+    private static final int HAMBURGER_LEFT = 10, HAMBURGER_RIGHT = 40;
+    private static final int HAMBURGER_TOP = 5, HAMBURGER_BOTTOM = 35;
+
     private final int maxBet;
     private int value;
 
@@ -120,6 +150,15 @@ public class BetStepper extends GameObject {
         return px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT && py >= ACHIEVEMENTS_TOP && py < ACHIEVEMENTS_BOTTOM;
     }
 
+    /**
+     * Half-open rect hit-test for the hamburger-menu icon, same convention as
+     * isRulesHotspot/isAchievementsHotspot -- see the HAMBURGER_* fields'
+     * comment for this geometry's clearance proof.
+     */
+    public boolean isHamburgerHotspot(int px, int py) {
+        return px >= HAMBURGER_LEFT && px < HAMBURGER_RIGHT && py >= HAMBURGER_TOP && py < HAMBURGER_BOTTOM;
+    }
+
     @Override
     public void tick() {
 
@@ -127,6 +166,8 @@ public class BetStepper extends GameObject {
 
     @Override
     public void render(Graphics g) {
+        renderHamburgerIcon(g);
+
         g.setColor(Color.BLACK);
         g.drawRect(DECREMENT_LEFT, TOP, DECREMENT_RIGHT - DECREMENT_LEFT - 1, BOTTOM - TOP - 1);
         g.drawString("-", DECREMENT_LEFT + 10, BOTTOM - 10);
@@ -150,5 +191,21 @@ public class BetStepper extends GameObject {
         int achievementsLabelWidth = metrics.stringWidth(ACHIEVEMENTS_LABEL);
         int achievementsLabelX = ACHIEVEMENTS_LEFT + ((ACHIEVEMENTS_RIGHT - ACHIEVEMENTS_LEFT) - achievementsLabelWidth) / 2;
         g.drawString(ACHIEVEMENTS_LABEL, achievementsLabelX, ACHIEVEMENTS_BOTTOM - 10);
+    }
+
+    /**
+     * Draws the hamburger icon (three horizontal lines) inside HAMBURGER_*'s
+     * bounds -- duplicated identically in IllegalPlayFeedback/NextTrickPrompt,
+     * same convention as this class's own Rules/Achievements box rendering.
+     */
+    private static void renderHamburgerIcon(Graphics g) {
+        g.setColor(Color.BLACK);
+        int lineLeft = HAMBURGER_LEFT + 4;
+        int lineRight = HAMBURGER_RIGHT - 4;
+        int gap = (HAMBURGER_BOTTOM - HAMBURGER_TOP) / 4;
+        for (int i = 1; i <= 3; i++) {
+            int lineY = HAMBURGER_TOP + gap * i;
+            g.drawLine(lineLeft, lineY, lineRight, lineY);
+        }
     }
 }

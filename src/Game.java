@@ -4,6 +4,7 @@ import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -160,21 +161,96 @@ public class Game extends Canvas implements Runnable{
         //handler.addObject(new Card(Suit.HEARTS, CardValue.ACE));
 
         this.aiNames = aiNames;
-        String humanName = captureHumanName(aiNames);
-
-        int numPlayers = aiNames.size() + 1;
-        assert numPlayers <= 5 : "You cannot have more than 5 players";
+        assert aiNames.size() + 1 <= 5 : "You cannot have more than 5 players";
 
         players = new ArrayList<>();
+
+        //Code-review fix (ROADMAP item 14): offerResume=true here (this used
+        //to be a hardcoded false, via captureHumanName()) -- mirrors
+        //handleMenuReturn()'s own runStartScreen() call, so a resumable
+        //on-disk snapshot (written continuously during play by
+        //saveGameStateCheckpoint(), independent of whether *this* process is
+        //the one that wrote it -- see GameStateStore's own class doc) is
+        //offered right at real process boot, not just the in-session
+        //Menu-return round trip. Neither branch below calls renderPlayers()
+        //itself -- play()'s own first-thing renderPlayers() call (unchanged)
+        //is what actually registers whichever players end up in this list
+        //with the Handler, exactly once; see that method's own comment on
+        //the double-registration trap this avoids.
+        StartScreenOutcome outcome = captureStartScreenOutcome(aiNames, true);
+        if (outcome.resumed) {
+            Optional<GameStateSnapshot> maybeSnapshot = gameStateStore.load();
+            boolean resumedOk = false;
+            if (maybeSnapshot.isPresent()) {
+                try {
+                    reconstructFromSnapshot(maybeSnapshot.get());
+                    resumedOk = true;
+                } catch (GameStateReconstructionException e) {
+                    e.printStackTrace();
+                    gameStateStore.clear();
+                }
+            }
+            if (!resumedOk) {
+                //Defensive fallback, mirrors resumeFromSavedGame()'s own --
+                //shouldn't happen (Resume is only offered when
+                //hasResumableGame() was true moments earlier, inside
+                //runStartScreen()) but a since-deleted/corrupt snapshot must
+                //not leave this instance half-built. Re-shows the Start
+                //Screen (without Resume, since we just established there's
+                //nothing usable to resume) to capture a name for a fresh
+                //game instead.
+                //
+                //Bug fix (user-reported, live playthrough): must NOT call
+                //establishFreshGameState() here -- that method's own
+                //renderPlayers() call, stacked on top of play()'s own
+                //unconditional first-thing renderPlayers() call moments
+                //later, double-registered every Player with the Handler
+                //(exactly the trap this constructor's own comment above
+                //already warned about, but didn't actually avoid). roundIndex/
+                //currentRound/roundsHitBonusThisGame/wasSoleLastAtHalfway are
+                //already at their correct just-constructed defaults here, so
+                //only players actually needs building.
+                gameStateStore.clear();
+                players.addAll(buildPlayers(aiNames, captureHumanName(aiNames)));
+            }
+        } else {
+            //Code-review fix (ROADMAP item 14): the player was offered
+            //Resume and declined it in favor of a fresh Start Game -- clear
+            //the now-abandoned saved game, same rationale as
+            //establishFreshGameState()'s own gameStateStore.clear() call
+            //(leaving it on disk would let a later Resume try to reconstruct
+            //Player instances that don't match this instance's fresh
+            //`players` list).
+            //
+            //Bug fix (user-reported, live playthrough): same
+            //double-registration trap as the branch above -- do not call
+            //establishFreshGameState() (its own renderPlayers() call stacks
+            //with play()'s), just build the fresh player list directly.
+            gameStateStore.clear();
+            players.addAll(buildPlayers(aiNames, outcome.humanName));
+        }
+    }
+
+    /**
+     * ROADMAP item 10: the "build a fresh set of players" logic, extracted
+     * from the constructor so the Menu-return recovery path (see
+     * establishFreshGameState()) can rebuild an equivalent fresh player list
+     * on the same live Game instance without duplicating this switch. Always
+     * seats the human first (matching every other assumption in this class
+     * that getPlayers().get(0) is the human), then one AI per aiNames entry
+     * with the same hardcoded personality assignment the constructor always
+     * used. Returns a new list rather than mutating the `players` field
+     * directly -- callers decide how to apply it (constructor assigns
+     * directly; the recovery path clears+addAlls into the existing final
+     * field, per its own doc).
+     */
+    private List<Player> buildPlayers(List<String> aiNames, String humanName) {
+        List<Player> newPlayers = new ArrayList<>();
         //design/persistent-game-state.md Phase 7: the checkpoint callback
         //reads Game's own live fields (currentRound et al.) at call time via
         //this method reference -- never a captured stale copy.
-        players.add(new Human(humanName, mouseInput, handler, achievementToast, saveData, this::saveGameStateCheckpoint));
-        for (String aiName : aiNames) {
-            //players.add(new AI_Easy(aiName));
-            //players.add(new AI_Medium(aiName, AIPersonality.MEDIUM_BALANCED));
-            // — other personalities are MEDIUM_BOLD and MEDIUM_CAUTIOUS (see AIPersonality.java)
-        }
+        newPlayers.add(new Human(humanName, mouseInput, handler, achievementToast, saveData,
+                this::saveGameStateCheckpoint, gameSettings, this::onReturnToMenu, this::onRestartConfirmed));
         for (int i = 0; i < aiNames.size(); i++) {
             String aiName = aiNames.get(i);
             AIPersonality personality;
@@ -193,23 +269,12 @@ public class Game extends Canvas implements Runnable{
                     break;
             }
             if (personality != null) {
-                players.add(new AI_Medium(aiName, personality));
+                newPlayers.add(new AI_Medium(aiName, personality));
             } else {
-                players.add(new AI_Easy(aiName));
+                newPlayers.add(new AI_Easy(aiName));
             }
         }
-        
-        
-        
-        // players.add(new AI_Medium(aiNames.get(0), AIPersonality.MEDIUM_BALANCED));
-        // players.add(new AI_Medium(aiNames.get(1), AIPersonality.MEDIUM_BOLD));
-        // players.add(new AI_Medium(aiNames.get(2), AIPersonality.MEDIUM_CAUTIOUS));
-        // players.add(new AI_Easy(aiNames.get(3)));
-
-
-        roundIndex = 0;
-        Random r = new Random();
-        roundStartingPlayer = r.nextInt(numPlayers);
+        return newPlayers;
     }
 
     /**
@@ -248,7 +313,8 @@ public class Game extends Canvas implements Runnable{
         buildWindow();
 
         GameStateCodec.Reconstructed reconstructed = GameStateCodec.fromSnapshot(snapshot, WIDTH, HEIGHT, handler,
-                mouseInput, achievementToast, saveData, this::saveGameStateCheckpoint);
+                mouseInput, achievementToast, saveData, this::saveGameStateCheckpoint,
+                gameSettings, this::onReturnToMenu, this::onRestartConfirmed);
 
         players = reconstructed.players;
         this.aiNames = players.stream()
@@ -281,21 +347,80 @@ public class Game extends Canvas implements Runnable{
      * constructed.
      */
     String captureHumanName(List<String> aiNames) {
-        return runStartScreen(aiNames);
+        return runStartScreen(aiNames, false).humanName;
     }
 
     /**
-     * Blocking click-loop for the pre-launch Start Screen. Reuses the same
-     * StartScreen instance across a Rules round-trip (nested RulesView is
-     * shown on top via its own showBlocking call, then this loop resumes) so
-     * a partially-typed name survives visiting Rules and coming back.
+     * Code-review fix (ROADMAP item 14): the boot-time analog of
+     * captureHumanName() above -- same runStartScreen() click-loop seam, but
+     * surfaces the full StartScreenOutcome (Start Game vs. Resume Game)
+     * instead of collapsing it down to a human-name string, since the plain
+     * constructor (unlike every other runStartScreen() caller except
+     * handleMenuReturn()) needs to branch on which control the user actually
+     * clicked. Package-private and non-final, mirroring
+     * captureHumanName()'s own testability-seam convention -- the
+     * HeadlessGame test subclass overrides this one too, so every existing
+     * test that constructs a plain Game(aiNames) keeps getting a canned
+     * fresh-name outcome instead of blocking on a real click nothing in a
+     * test ever delivers.
      */
-    private String runStartScreen(List<String> aiNames) {
+    StartScreenOutcome captureStartScreenOutcome(List<String> aiNames, boolean offerResume) {
+        return runStartScreen(aiNames, offerResume);
+    }
+
+    /**
+     * ROADMAP item 10 §6: the outcome of one runStartScreen() call -- either
+     * a submitted, non-empty human name (fresh game) or a Resume selection.
+     * humanName is null when resumed is true and vice versa.
+     *
+     * Package-private (not private): ROADMAP item 14's boot-time resume fix
+     * needs a test seam (captureStartScreenOutcome(), below) that returns
+     * this type, and the HeadlessGame test subclass that overrides it lives
+     * in a different top-level file (TestGame.java) -- see that seam's own
+     * doc.
+     */
+    static final class StartScreenOutcome {
+        final String humanName;
+        final boolean resumed;
+
+        private StartScreenOutcome(String humanName, boolean resumed) {
+            this.humanName = humanName;
+            this.resumed = resumed;
+        }
+
+        static StartScreenOutcome name(String humanName) {
+            return new StartScreenOutcome(humanName, false);
+        }
+
+        static StartScreenOutcome resume() {
+            return new StartScreenOutcome(null, true);
+        }
+    }
+
+    /**
+     * Blocking click-loop for the Start Screen -- used both pre-launch (via
+     * captureHumanName, offerResume always false there) and by the "Menu"
+     * hamburger item's recovery flow (handleMenuReturn(), offerResume true).
+     * Reuses the same StartScreen instance across a Rules/Achievements
+     * round-trip (nested view shown on top via its own showBlocking call,
+     * then this loop resumes) so a partially-typed name survives visiting
+     * either and coming back.
+     *
+     * ROADMAP item 10 §6: offerResume gates whether the Resume Game button
+     * can even show -- hasResumableGame() is only consulted when the caller
+     * asks for it, so the original pre-launch/restart call sites (which never
+     * have a resumable game at the moment they call this: the constructor
+     * runs before any game state exists, and restartForNewGame() clears the
+     * saved game before calling captureHumanName) are unaffected either way.
+     */
+    private StartScreenOutcome runStartScreen(List<String> aiNames, boolean offerResume) {
+        boolean resumable = offerResume && hasResumableGame();
         //ROADMAP item 2: the stat line's data is a snapshot of saveData as of
         //this StartScreen's construction -- fine, since saveData only
         //changes via this same class's round-end/game-end/name-submission
         //hooks, none of which run while a StartScreen is on screen.
-        StartScreen startScreen = new StartScreen(saveData.gamesPlayed, saveData.highScore, saveData.bestWinStreakEver);
+        StartScreen startScreen = new StartScreen(saveData.gamesPlayed, saveData.highScore,
+                saveData.bestWinStreakEver, resumable);
         handler.addObject(startScreen);
         keyInput.setTarget(startScreen);
         this.requestFocusInWindow();
@@ -316,6 +441,8 @@ public class Game extends Canvas implements Runnable{
                         AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
                         mouseInput.clearClicks();
                         continue;
+                    case RESUME:
+                        return StartScreenOutcome.resume();
                     case START:
                         String typedName = startScreen.getName().trim();
                         if (!typedName.isEmpty()) {
@@ -329,7 +456,7 @@ public class Game extends Canvas implements Runnable{
                                 saveStore.save(saveData);
                                 achievementToast.enqueue(Achievement.BAPI_EASTER_EGG);
                             }
-                            return typedName;
+                            return StartScreenOutcome.name(typedName);
                         }
                         continue;
                 }
@@ -344,8 +471,42 @@ public class Game extends Canvas implements Runnable{
         return 10 - roundIndex;
     }
 
-    private void play() {
+    /** ROADMAP item 10: whether every player has already placed a bet this round -- see playOneRound()'s mid-betting-phase resume comment. */
+    private boolean allPlayersHaveBet() {
+        return getPlayers().stream().allMatch(Player::hasBet);
+    }
+
+    /**
+     * The one-time render setup play() needs before its first frame --
+     * extracted so a test can verify it directly without entering play()'s
+     * own infinite loop (mirrors this class's existing buildWindow/
+     * captureHumanName testability-seam convention).
+     *
+     * Bug fix (user-reported, live playthrough): a process-boot Resume (the
+     * constructor's own reconstructFromSnapshot() branch, reached from java
+     * Game's main()/run() -- as opposed to an in-session Menu->Resume, which
+     * goes through resumeFromSavedGame() and already calls both of these)
+     * deliberately defers renderPlayers()/repositionHumanHand() to here (see
+     * reconstructFromSnapshot()'s own doc on why), but only the
+     * renderPlayers() half of that was ever actually done here -- the
+     * repositionHumanHand() call was missing entirely. Without it, the
+     * human's Hand keeps the x/y positionHumanHand() gave it *before*
+     * renderPlayers() (just above) set the player's real on-screen position,
+     * i.e. stale/default (0,0) -- so Hand.layoutCards()'s
+     * `getX() * i / numCards` puts every card at x=0, stacking them exactly
+     * on top of each other. Looks exactly like "not all my cards show up in
+     * my hand" after a full app close+reopen (every other resume path was
+     * unaffected).
+     */
+    void establishInitialRenderState() {
         renderPlayers();
+        if (currentRound != null) {
+            currentRound.repositionHumanHand();
+        }
+    }
+
+    private void play() {
+        establishInitialRenderState();
         //ROADMAP item 2: real gameplay begins here -- flips the toast queue
         //live so anything enqueued during the Start Screen (the Bapi easter
         //egg fires at name-submission time, before this point) renders on
@@ -362,45 +523,289 @@ public class Game extends Canvas implements Runnable{
         //CopyOnWriteArrayList, silently doubling every per-frame tick()/
         //render() call per player.
         while (true) {
-            //for each round
-            while (roundIndex < 10) {
-                playOneRound();
+            try {
+                //for each round
+                while (roundIndex < 10) {
+                    playOneRound();
+                }
+                //determine winner
+                Player winner = determineWinner();
+                System.out.println(winner.getName() + " won the game!");
+
+                //design/persistent-game-state.md Phase 8: a completed game
+                //shouldn't offer resume -- clear the saved game now, before the
+                //game-over banner/Play Again flow even starts.
+                gameStateStore.clear();
+
+                //ROADMAP item 2: game-end achievement/stat checks -- updates
+                //gamesPlayed/gamesWon/highScore/currentWinStreak/bestWinStreakEver
+                //and checks FIRST_VICTORY/TEN_GAMES_PLAYED/WIN_STREAK_3/5/10/
+                //FLAWLESS_GAME/COMEBACK_KID, all *before* showGameOverBanner so the
+                //banner can reflect the just-updated values (new-high-score/
+                //streak lines).
+                boolean humanWon = isHumanWinner(winner);
+                Player human = getHumanPlayer();
+                int finalHumanScore = human.getScore();
+                int previousHighScore = saveData.highScore;
+                int previousWinStreak = saveData.currentWinStreak;
+                boolean flawlessGame = isFlawlessGame(roundsHitBonusThisGame);
+
+                List<Achievement> newlyUnlockedThisGame = AchievementEngine.checkGameEnd(
+                        saveData, humanWon, finalHumanScore, flawlessGame, wasSoleLastAtHalfway);
+                saveStore.save(saveData);
+                achievementToast.enqueueAll(newlyUnlockedThisGame);
+
+                boolean newHighScore = finalHumanScore > previousHighScore;
+                int streakToReport = humanWon ? saveData.currentWinStreak : previousWinStreak;
+
+                GameOverBanner banner = showGameOverBanner(winner, newHighScore, streakToReport);
+                awaitPlayAgain(banner);
+                handler.removeObject(banner);
+                restartForNewGame();
+            } catch (ReturnToMenuSignal signal) {
+                //ROADMAP item 10 ("Menu"): the in-progress game was already
+                //checkpointed by onReturnToMenu() right before this was
+                //thrown -- clean up the stale Player/trump/hand registrations
+                //(see cleanupHandlerForMenuOrRestart()'s doc) then hand off to
+                //the Resume-aware Start Screen.
+                cleanupHandlerForMenuOrRestart();
+                handleMenuReturn();
+            } catch (RestartGameSignal signal) {
+                //ROADMAP item 10 ("Restart", confirmed): abandonAndRestart()
+                //does its own handler cleanup (see its doc) before delegating
+                //to the unmodified restartForNewGame().
+                abandonAndRestart();
             }
-            //determine winner
-            Player winner = determineWinner();
-            System.out.println(winner.getName() + " won the game!");
-
-            //design/persistent-game-state.md Phase 8: a completed game
-            //shouldn't offer resume -- clear the saved game now, before the
-            //game-over banner/Play Again flow even starts.
-            gameStateStore.clear();
-
-            //ROADMAP item 2: game-end achievement/stat checks -- updates
-            //gamesPlayed/gamesWon/highScore/currentWinStreak/bestWinStreakEver
-            //and checks FIRST_VICTORY/TEN_GAMES_PLAYED/WIN_STREAK_3/5/10/
-            //FLAWLESS_GAME/COMEBACK_KID, all *before* showGameOverBanner so the
-            //banner can reflect the just-updated values (new-high-score/
-            //streak lines).
-            boolean humanWon = isHumanWinner(winner);
-            Player human = getHumanPlayer();
-            int finalHumanScore = human.getScore();
-            int previousHighScore = saveData.highScore;
-            int previousWinStreak = saveData.currentWinStreak;
-            boolean flawlessGame = isFlawlessGame(roundsHitBonusThisGame);
-
-            List<Achievement> newlyUnlockedThisGame = AchievementEngine.checkGameEnd(
-                    saveData, humanWon, finalHumanScore, flawlessGame, wasSoleLastAtHalfway);
-            saveStore.save(saveData);
-            achievementToast.enqueueAll(newlyUnlockedThisGame);
-
-            boolean newHighScore = finalHumanScore > previousHighScore;
-            int streakToReport = humanWon ? saveData.currentWinStreak : previousWinStreak;
-
-            GameOverBanner banner = showGameOverBanner(winner, newHighScore, streakToReport);
-            awaitPlayAgain(banner);
-            handler.removeObject(banner);
-            restartForNewGame();
         }
+    }
+
+    /**
+     * ROADMAP item 10 ("Menu"/"Restart"): thrown as ReturnToMenuSignal, an
+     * unchecked control-flow signal caught only by play()'s own outer loop --
+     * see that class's doc for the full propagation story. Checkpoints once
+     * more immediately before throwing (belt-and-suspenders on top of
+     * whichever Human-loop checkpoint already ran just before this was
+     * invoked) so the saved game reflects the exact moment Menu was clicked.
+     */
+    private void onReturnToMenu() {
+        saveGameStateCheckpoint();
+        throw new ReturnToMenuSignal();
+    }
+
+    /**
+     * ROADMAP item 10 ("Restart", confirmed): thrown as RestartGameSignal --
+     * only ever invoked after HamburgerMenu's own "Are you sure? [Yes]/[No]"
+     * confirmation step has already resolved to Yes, so by this point the
+     * user has clicked Restart twice, not once.
+     */
+    private void onRestartConfirmed() {
+        throw new RestartGameSignal();
+    }
+
+    /**
+     * ROADMAP item 10 ("Menu"/"Restart"): removes every currently-registered
+     * Player from the Handler (required to avoid double-registration once
+     * either recovery path re-adds a fresh or reconstructed player list via
+     * renderPlayers() -- otherwise every player's tick()/render() would fire
+     * twice a frame), plus the in-progress round's trump card and the
+     * human's Hand object, if either exists. Deliberately does NOT chase any
+     * already-played-this-trick stray Card objects still registered with the
+     * handler -- a known, pre-existing, accepted leak (ROADMAP item 16), not
+     * newly introduced or expanded by this method. Package-private (not
+     * private), mirroring this class's existing testability-seam convention,
+     * so TestGame can exercise this cleanup step directly.
+     */
+    void cleanupHandlerForMenuOrRestart() {
+        for (Player player : getPlayers()) {
+            handler.removeObject(player);
+        }
+        Card trumpCard = currentRound != null ? currentRound.getTrumpCard() : null;
+        if (trumpCard != null) {
+            handler.removeObject(trumpCard);
+        }
+        getPlayers().stream()
+                .filter(player -> player.getID() == ID.HUMAN)
+                .findFirst()
+                .map(Player::getHand)
+                .ifPresent(handler::removeObject);
+    }
+
+    /**
+     * ROADMAP item 10 ("Menu"): re-runs the Start Screen (with the Resume
+     * button available, since a checkpoint was just written by
+     * onReturnToMenu() right before this was reached) and branches on
+     * whether the player picks Resume or types a name and clicks Start Game.
+     *
+     * Known, accepted, explicitly-not-decided-here product gap: if the
+     * player picks a fresh Start Game instead of Resume, the suspended game
+     * is abandoned with no extra confirmation (unlike Restart, which requires
+     * an explicit second click) -- see this item's completion report.
+     */
+    void handleMenuReturn() {
+        StartScreenOutcome outcome = runStartScreen(aiNames, true);
+        if (outcome.resumed) {
+            resumeFromSavedGame();
+        } else {
+            establishFreshGameState(outcome.humanName);
+        }
+    }
+
+    /**
+     * ROADMAP item 10 §6: reconstructs live state from the on-disk snapshot
+     * directly onto this same Game instance -- reusing the already-built
+     * handler/mouseInput/achievementToast/saveData (and this Window), NOT
+     * constructing a second Game/Window the way the Game(GameStateSnapshot)
+     * constructor does for a genuine fresh-process relaunch. Mirrors that
+     * constructor's own body, minus the window/handler/mouseInput
+     * construction it doesn't need to repeat here.
+     *
+     * A missing or corrupt snapshot (shouldn't happen -- Resume is only
+     * offered when hasResumableGame() was true at Start Screen construction
+     * time -- but defensively handled rather than assumed) falls back to a
+     * fresh game rather than leaving the instance in a half-built state,
+     * mirroring SaveStore/GameStateStore's own never-crash-gameplay
+     * convention. Package-private (not private), mirroring this class's
+     * existing testability-seam convention, so TestGame can exercise the
+     * reconstruction step directly without threading a click through the
+     * full Start Screen Resume button.
+     */
+    void resumeFromSavedGame() {
+        Optional<GameStateSnapshot> maybeSnapshot = gameStateStore.load();
+        if (maybeSnapshot.isEmpty()) {
+            establishFreshGameState(captureHumanName(aiNames));
+            return;
+        }
+        try {
+            reconstructFromSnapshot(maybeSnapshot.get());
+
+            renderPlayers();
+            if (currentRound != null) {
+                // Round reconstruction (inside fromSnapshot, above) positioned
+                // the human's hand using the player's x/y *before* renderPlayers()
+                // (just above) had actually set it -- fix it up now that it has.
+                // Same order-of-operations the Game(GameStateSnapshot) constructor
+                // already has to work around -- see its own comment.
+                currentRound.repositionHumanHand();
+            }
+        } catch (GameStateReconstructionException e) {
+            e.printStackTrace();
+            gameStateStore.clear();
+            establishFreshGameState(captureHumanName(aiNames));
+        }
+    }
+
+    /**
+     * Code-review fix (ROADMAP item 14): the "load a snapshot's object graph
+     * onto this Game instance's own fields" core, extracted from
+     * resumeFromSavedGame() so the plain (boot-time) constructor's own Resume
+     * branch can reuse it too, instead of a third inline copy of this same
+     * GameStateCodec.fromSnapshot() call + field-population sequence.
+     * Deliberately does NOT call renderPlayers()/repositionHumanHand() --
+     * callers differ on when it's safe to do that. resumeFromSavedGame()
+     * calls both immediately after, since play()'s own one-time
+     * renderPlayers() call already ran long before an in-session Menu click
+     * is possible; the constructor defers both to play()'s own upcoming
+     * first-thing renderPlayers() call instead (see play()'s own comment),
+     * to avoid double-registering every Player with the Handler.
+     */
+    private void reconstructFromSnapshot(GameStateSnapshot snapshot) throws GameStateReconstructionException {
+        GameStateCodec.Reconstructed reconstructed = GameStateCodec.fromSnapshot(snapshot, WIDTH, HEIGHT,
+                handler, mouseInput, achievementToast, saveData, this::saveGameStateCheckpoint,
+                gameSettings, this::onReturnToMenu, this::onRestartConfirmed);
+
+        players.clear();
+        players.addAll(reconstructed.players);
+        currentRound = reconstructed.round;
+        roundIndex = snapshot.roundIndex;
+        roundStartingPlayer = snapshot.roundStartingPlayer;
+        roundsHitBonusThisGame = snapshot.roundsHitBonusThisGame;
+        wasSoleLastAtHalfway = snapshot.wasSoleLastAtHalfway;
+    }
+
+    /**
+     * ROADMAP items 10/14: rebuilds a brand-new set of players (via
+     * buildPlayers(), the same logic the constructor itself uses) directly
+     * onto this same Game instance, and resets round bookkeeping to a fresh
+     * game's starting state -- mirrors restartForNewGame()'s own reset
+     * fields, but on freshly-built Player objects rather than the same
+     * instances. Shared by two callers: the "Menu" hamburger item's
+     * fresh-Start-Game branch (old Player instances already removed from the
+     * handler by cleanupHandlerForMenuOrRestart()), and the boot-time
+     * constructor's own declined-Resume/missing-snapshot branches (no old
+     * Player instances exist yet in that case -- players is still empty).
+     *
+     * Clears the now-abandoned saved game: leaving it on disk would let a
+     * later Resume (e.g. after a crash) try to resume state describing
+     * Player objects that no longer match this instance's live `players`
+     * list -- a latent, worse bug than simply losing the abandoned game.
+     *
+     * Package-private (not private), mirroring resumeFromSavedGame()'s own
+     * testability-seam convention, so TestGame can exercise the Menu-return
+     * fresh-game path's Handler re-registration directly without threading
+     * real clicks through the full Start Screen.
+     */
+    void establishFreshGameState(String humanName) {
+        gameStateStore.clear();
+        players.clear();
+        players.addAll(buildPlayers(aiNames, humanName));
+        currentRound = null;
+        roundIndex = 0;
+        roundStartingPlayer = new Random().nextInt(numPlayers());
+        roundsHitBonusThisGame = 0;
+        wasSoleLastAtHalfway = false;
+        renderPlayers();
+    }
+
+    /**
+     * ROADMAP item 10 ("Restart", confirmed): NOT simply restartForNewGame().
+     * Resetting currentWinStreak to 0 (and persisting it immediately) is a
+     * distinct preceding step for an abandoned game, not a variant of
+     * restart itself -- this deliberately does NOT run
+     * AchievementEngine.checkGameEnd or touch gamesPlayed/gamesWon/highScore
+     * (this game never finished, it was abandoned), and does NOT modify
+     * restartForNewGame()'s own signature/behavior, which the natural
+     * post-game-end Play Again flow still uses unchanged.
+     *
+     * Bug found via manual verification of this item (not caught by the
+     * automated suite, which never drove a full Restart-mid-round -> next
+     * round sequence): restartForNewGame() resets every player's state
+     * (including nulling each player's Hand, via Player.resetForNewGame())
+     * but was never responsible for nulling Game's own currentRound field --
+     * before this item, restartForNewGame() was only ever reachable once a
+     * round had already finished normally (currentRound already null by
+     * then). Restart confirmed mid-round is this item's new way to reach
+     * restartForNewGame() while currentRound is still genuinely non-null; if
+     * left as-is, playOneRound()'s resume-aware currentRound == null check
+     * would treat that stale Round as still in progress and call bet() on
+     * players whose hands had just been reset to null -- an NPE. Nulling it
+     * here, before restartForNewGame() runs, closes that gap without
+     * touching restartForNewGame() itself.
+     *
+     * Second bug found the same manual pass, same root cause shape:
+     * cleanupHandlerForMenuOrRestart() removes every player from the Handler
+     * (required for the Menu/Resume path, where a *new* set of
+     * reconstructed/rebuilt Player objects gets re-registered via
+     * renderPlayers() afterward) -- but restartForNewGame() reuses the exact
+     * same Player instances and, by its own established contract, never
+     * re-adds them to the Handler itself (before this item, restartForNewGame()
+     * was only ever reachable via the natural Play-Again flow, which never
+     * removes players from the Handler in the first place, so nothing needed
+     * to re-add them). Left unfixed, a mid-round Restart leaves every
+     * player -- human included -- permanently deregistered: still fully
+     * functional as game-logic objects (Round/Trick call their methods
+     * directly, not through the Handler), but invisible on screen forever
+     * after (confirmed live: no HUD text, no name, no score, for any seat,
+     * for the rest of the session). renderPlayers() re-adds these same
+     * instances after restartForNewGame() runs.
+     */
+    void abandonAndRestart() {
+        saveData.currentWinStreak = 0;
+        saveStore.save(saveData);
+        gameStateStore.clear();
+        cleanupHandlerForMenuOrRestart();
+        currentRound = null;
+        restartForNewGame();
+        renderPlayers();
     }
 
     /**
@@ -415,11 +820,36 @@ public class Game extends Canvas implements Runnable{
      */
     void playOneRound() {
         int currentPlayer = roundStartingPlayer;
-        Round round = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
-        currentRound = round;
-
-        //bet
-        round.bet(currentPlayer, gameSettings);
+        //ROADMAP item 10 §8: currentRound is already non-null exactly when a
+        //Resume (see resumeFromSavedGame()) populated it -- skip dealing
+        //entirely in that case (deal already happened before the snapshot
+        //was taken). currentRound is nulled again below, right after
+        //round.playRound() finishes, at the normal point -- so this check is
+        //false on every ordinary (non-resumed) call.
+        if (currentRound == null) {
+            currentRound = new Round(numCardsThisRound(), getPlayers(), currentPlayer, WIDTH, HEIGHT, handler);
+            currentRound.bet(currentPlayer, gameSettings);
+        } else if (!allPlayersHaveBet()) {
+            //Discovered during manual verification of this item, not called
+            //out by the original design doc's checkpoint-cadence writeup:
+            //design/persistent-game-state.md §6 checkpoints right before/
+            //after Human.bet()'s own blocking click-loop -- so a Menu click
+            //taken at exactly that moment (e.g. the human is the round's
+            //first bettor and hasn't bet yet) resumes with currentRound
+            //already non-null but betting genuinely incomplete. Round.bet()
+            //itself unconditionally resets every player's bet at its own
+            //top, so calling it again necessarily restarts the whole
+            //betting phase from the round's original starting player (not
+            //just the specific bettor who was mid-turn) -- a deliberate,
+            //documented simplification rather than deeper surgery on
+            //Round.bet() to resume a partial bet-by-bet sequence. Every
+            //other resume case (between rounds, mid-trick, between tricks)
+            //already has every player's bet restored (hasBet() true for
+            //all), so this branch is a no-op for those and only fires for
+            //the specific mid-betting-phase checkpoint case.
+            currentRound.bet(currentRound.getCurrentPlayer(), gameSettings);
+        }
+        Round round = currentRound;
 
         //play round
         round.playRound();
@@ -521,9 +951,34 @@ public class Game extends Canvas implements Runnable{
         return achievementToast;
     }
 
+    /** Test-only accessor (package-private), mirroring getMouseInput()/getAchievementToast() -- lets TestGame confirm no duplicate Player registration after a Menu/Resume round-trip. */
+    Handler getHandler() {
+        return handler;
+    }
+
+    /** Test-only accessor (package-private), mirroring getMouseInput()/getAchievementToast() -- lets TestGame set up/inspect win-streak and achievement-unlock state around abandonAndRestart(). */
+    SaveData getSaveData() {
+        return saveData;
+    }
+
+    /** Test-only accessor (package-private), mirroring getMouseInput()/getAchievementToast() -- lets TestGame confirm SettingsView mutates the exact same GameSettings instance Round.bet() reads from. */
+    GameSettings getGameSettings() {
+        return gameSettings;
+    }
+
     /** design/persistent-game-state.md Phase 4: the round currently in progress, or null before the first round is constructed. */
     Round getCurrentRound() {
         return currentRound;
+    }
+
+    /** Test-only setter (package-private) -- lets TestGame set up a genuinely in-progress currentRound without driving a real blocking bet()/playCard() click sequence. */
+    void setCurrentRoundForTest(Round round) {
+        currentRound = round;
+    }
+
+    /** Test-only accessor (package-private) -- lets TestGame write a specific GameStateSnapshot directly to the same store resumeFromSavedGame() reads from, without driving a real Menu click sequence first. */
+    GameStateStore getGameStateStore() {
+        return gameStateStore;
     }
 
     /**
@@ -828,12 +1283,40 @@ public class Game extends Canvas implements Runnable{
         stop();
     }
 
+    /**
+     * ROADMAP item 10 (user feedback pass): the AI seat row's shared render
+     * y -- was a 50 literal, moved down to 70 so the hamburger icon/dropdown
+     * (now anchored at the very top of the canvas, per user request; see
+     * BetStepper.HAMBURGER_TOP's own doc) has room above this row's name
+     * text without colliding with it, at every supported player count (the
+     * leftmost AI seat is always at x=0, see renderPlayers()'s x formula
+     * below, so it's always directly under the top-left-anchored dropdown
+     * regardless of how many AI opponents are seated).
+     *
+     * 70, not something larger: this is a *tight* upper bound, not a
+     * comfortable round number picked for its own sake. Pushing this row
+     * down further runs into two fixed constraints below it that this change
+     * does not touch: NextTrickPrompt/IllegalPlayFeedback's shared centered-
+     * message band (baseline y=280) and, below that, the trump card's top
+     * border edge (y=305, Round.renderTrumpCard()) -- the two of those are
+     * already only ~21px apart with no slack to redistribute. At y=70, this
+     * row's own lowest text (the score line, this row's y+185) sits ~9px
+     * above the message band; its played card (this row's y+30..+130, up to
+     * +14 more for the high-card ring) sits ~91px above the message band and
+     * ~30px (with the ring) above the trump card's own top edge (comfortable
+     * margin, not the binding constraint). See
+     * TestHamburgerIconGeometry for the full algebraic proof, across every
+     * supported player count (1-4 AI opponents), that this value clears the
+     * hamburger dropdown above and the message band/trump card below.
+     */
+    static final int AI_ROW_Y = 70;
+
     public void renderPlayers() {
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
             if (player.getID() == ID.AI) {
                 int x = (WIDTH * (i - 1)) / (numPlayers() - 1);
-                int y = 50;
+                int y = AI_ROW_Y;
                 player.setX(x);
                 player.setY(y);
                 handler.addObject(player);

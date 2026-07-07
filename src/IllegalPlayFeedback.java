@@ -52,6 +52,14 @@ public class IllegalPlayFeedback extends GameObject {
     private static final int ACHIEVEMENTS_TOP = 265, ACHIEVEMENTS_BOTTOM = 295;
     private static final int ACHIEVEMENTS_LEFT = 600, ACHIEVEMENTS_RIGHT = 730;
 
+    // ROADMAP item 10, moved to the very top of the canvas per user feedback:
+    // hamburger-menu icon, top-left corner -- duplicated (not shared) across
+    // BetStepper/IllegalPlayFeedback/NextTrickPrompt; see BetStepper's
+    // HAMBURGER_* fields comment for the full clearance proof and the
+    // documented AchievementToast-band trade-off.
+    private static final int HAMBURGER_LEFT = 10, HAMBURGER_RIGHT = 40;
+    private static final int HAMBURGER_TOP = 5, HAMBURGER_BOTTOM = 35;
+
     private String text = null;
     private int elapsed = TOTAL_TICKS;  // starts "already expired"
 
@@ -68,6 +76,8 @@ public class IllegalPlayFeedback extends GameObject {
     @Override
     public void render(Graphics g) {
         Font defaultFont = g.getFont();
+
+        renderHamburgerIcon(g);
 
         if (text != null && elapsed < TOTAL_TICKS) {
             Color color = colorAt(elapsed);
@@ -108,6 +118,31 @@ public class IllegalPlayFeedback extends GameObject {
      */
     public boolean isAchievementsHotspot(int px, int py) {
         return px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT && py >= ACHIEVEMENTS_TOP && py < ACHIEVEMENTS_BOTTOM;
+    }
+
+    /**
+     * Half-open rect hit-test for the hamburger-menu icon, same convention as
+     * isRulesHotspot/isAchievementsHotspot -- see the HAMBURGER_* fields'
+     * comment for this geometry's clearance proof.
+     */
+    public boolean isHamburgerHotspot(int px, int py) {
+        return px >= HAMBURGER_LEFT && px < HAMBURGER_RIGHT && py >= HAMBURGER_TOP && py < HAMBURGER_BOTTOM;
+    }
+
+    /**
+     * Draws the hamburger icon (three horizontal lines) inside HAMBURGER_*'s
+     * bounds -- duplicated identically in BetStepper/NextTrickPrompt, same
+     * convention as this class's own Rules/Achievements box rendering.
+     */
+    private static void renderHamburgerIcon(Graphics g) {
+        g.setColor(Color.BLACK);
+        int lineLeft = HAMBURGER_LEFT + 4;
+        int lineRight = HAMBURGER_RIGHT - 4;
+        int gap = (HAMBURGER_BOTTOM - HAMBURGER_TOP) / 4;
+        for (int i = 1; i <= 3; i++) {
+            int lineY = HAMBURGER_TOP + gap * i;
+            g.drawLine(lineLeft, lineY, lineRight, lineY);
+        }
     }
 
     /** Pulled out as a pure static function so the timing/fade math is testable without a window. */

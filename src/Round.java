@@ -179,13 +179,56 @@ public class Round {
     }
 
     public void playRound() {
-        trumpBroken = false;
-        //for each trick
-        for (int i = 0; i < numCards; i++) {
-            //for each player
-            int trickStartPlayer = currentPlayer;
+        //design/persistent-game-state.md Phase 5/ROADMAP item 10 §7: no
+        //longer unconditionally reset here -- the normal constructor already
+        //initializes trumpBroken to false, and the reconstruction constructor
+        //correctly restores it from a snapshot. Resetting it here
+        //unconditionally was harmless before this round could ever be
+        //resumed (playRound() only ever ran once, right after construction),
+        //but would silently clobber a resumed round's already-broken trump
+        //state back to false.
 
-            currentTrick = new Trick(players, currentPlayer, trump, trumpBroken, WIDTH, HEIGHT, handler);
+        //design/persistent-game-state.md Phase 5/ROADMAP item 10 §7: bound by
+        //however many tricks are actually left, not always numCards -- for a
+        //freshly-dealt round every hand is exactly numCards (identical to the
+        //old `i < numCards` behavior), but a round resumed mid-round has
+        //fewer cards left in each hand, and this must not re-loop past what's
+        //actually left to play.
+        //
+        //Bug fix (user-reported, live playthrough): a checkpoint taken while
+        //every player has ALREADY played this trick (Menu clicked exactly
+        //during Human.nextTrick()'s "click anywhere to continue" prompt --
+        //cards already removed from every hand, but this trick's winner/
+        //trickLeader/currentPlayer bookkeeping below hasn't run yet, since
+        //that only happens after currentTrick.play() returns, which is what's
+        //blocked on this exact prompt) needs one *extra* loop iteration to
+        //resolve that dangling trick -- hand size alone already "paid" for
+        //it (its cards are already gone), so counting hand size alone
+        //silently drops the round's real last trick every time this
+        //resumes, leaving every hand with one never-played card forever.
+        int remainingTricks = players.stream().mapToInt(p -> p.getHand().getNumCards()).max().orElse(0);
+        if (currentTrick != null && currentTrick.getCardsPlayedBySeat().size() >= numPlayers()) {
+            remainingTricks++;
+        }
+        //for each trick
+        for (int i = 0; i < remainingTricks; i++) {
+            //design/persistent-game-state.md Phase 5/ROADMAP item 10 §7: only
+            //construct a fresh Trick when there isn't already one in progress
+            //-- a resumed round's currentTrick was set by the reconstruction
+            //constructor (via setCurrentTrick) and must be resumed, not
+            //replaced, on this loop's first iteration. trickStartPlayer comes
+            //from the existing trick's own trickStartPlayer field in that
+            //case (see Trick's reconstruction constructor doc), which should
+            //always equal currentPlayer already, but is read directly for
+            //correctness/clarity rather than assumed.
+            int trickStartPlayer;
+            if (currentTrick == null) {
+                trickStartPlayer = currentPlayer;
+                currentTrick = new Trick(players, currentPlayer, trump, trumpBroken, WIDTH, HEIGHT, handler);
+            } else {
+                trickStartPlayer = currentTrick.getTrickStartPlayer();
+            }
+
             List<Card> cardsPlayed = currentTrick.play();
             if (!trumpBroken) {
                 trumpBroken = currentTrick.getTrumpBroken();

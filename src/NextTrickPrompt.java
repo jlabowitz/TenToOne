@@ -10,11 +10,17 @@ import java.awt.*;
  * at this moment the trick's played cards are still on the table (this
  * click is what lets the player see the completed trick before it's
  * cleared), so hiding the board here would defeat the point. Placed instead
- * in a verified-clear horizontal band: AI text's lowest glyph bottom is
- * ~239, the trump card's top border edge is 305 -- baseline 280 sits with
- * ~12px clearance above and ~21px below, and this band is empty of every
- * other on-screen element (AI cards y=80-180, human's played card
- * y=330-430, human's hand y=480-580) regardless of player count/hand size.
+ * in a verified-clear horizontal band: with Game.AI_ROW_Y=70 (see that
+ * field's own doc -- shifted down from the original 50 to clear the
+ * hamburger icon/dropdown now at the very top of the canvas), the AI seat
+ * row's lowest text (its score line, baseline y=70+185=255) has its glyph
+ * bottom at ~258, and the trump card's top border edge is 305 -- baseline
+ * 280 sits with ~9px clearance above the AI row's lowest text and ~21px
+ * below to the trump card, and this band is empty of every other on-screen
+ * element (AI cards y=100-200, human's played card y=330-430, human's hand
+ * y=480-580) regardless of player count/hand size. This ~9px margin above
+ * is the tightest clearance in this whole layout -- see Game.AI_ROW_Y's doc
+ * for why it can't be pushed any further down.
  *
  * ROADMAP item 1: also renders a small "Rules" hotspot in the same
  * verified-clear band, top-right of it and away from the centered prompt
@@ -46,6 +52,14 @@ public class NextTrickPrompt extends GameObject {
     private static final int ACHIEVEMENTS_TOP = 265, ACHIEVEMENTS_BOTTOM = 295;
     private static final int ACHIEVEMENTS_LEFT = 600, ACHIEVEMENTS_RIGHT = 730;
 
+    // ROADMAP item 10, moved to the very top of the canvas per user feedback:
+    // hamburger-menu icon, top-left corner -- duplicated (not shared) across
+    // BetStepper/IllegalPlayFeedback/NextTrickPrompt; see BetStepper's
+    // HAMBURGER_* fields comment for the full clearance proof and the
+    // documented AchievementToast-band trade-off.
+    private static final int HAMBURGER_LEFT = 10, HAMBURGER_RIGHT = 40;
+    private static final int HAMBURGER_TOP = 5, HAMBURGER_BOTTOM = 35;
+
     @Override
     public void tick() {
         //static content -- nothing to update per frame
@@ -53,6 +67,8 @@ public class NextTrickPrompt extends GameObject {
 
     @Override
     public void render(Graphics g) {
+        renderHamburgerIcon(g);
+
         Font defaultFont = g.getFont();
         g.setFont(defaultFont.deriveFont(Font.BOLD));
         g.setColor(Color.BLACK);
@@ -92,5 +108,30 @@ public class NextTrickPrompt extends GameObject {
      */
     public boolean isAchievementsHotspot(int px, int py) {
         return px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT && py >= ACHIEVEMENTS_TOP && py < ACHIEVEMENTS_BOTTOM;
+    }
+
+    /**
+     * Half-open rect hit-test for the hamburger-menu icon, same convention as
+     * isRulesHotspot/isAchievementsHotspot -- see BetStepper's HAMBURGER_*
+     * fields comment for this geometry's clearance proof.
+     */
+    public boolean isHamburgerHotspot(int px, int py) {
+        return px >= HAMBURGER_LEFT && px < HAMBURGER_RIGHT && py >= HAMBURGER_TOP && py < HAMBURGER_BOTTOM;
+    }
+
+    /**
+     * Draws the hamburger icon (three horizontal lines) inside HAMBURGER_*'s
+     * bounds -- duplicated identically in BetStepper/IllegalPlayFeedback, same
+     * convention as this class's own Rules/Achievements box rendering.
+     */
+    private static void renderHamburgerIcon(Graphics g) {
+        g.setColor(Color.BLACK);
+        int lineLeft = HAMBURGER_LEFT + 4;
+        int lineRight = HAMBURGER_RIGHT - 4;
+        int gap = (HAMBURGER_BOTTOM - HAMBURGER_TOP) / 4;
+        for (int i = 1; i <= 3; i++) {
+            int lineY = HAMBURGER_TOP + gap * i;
+            g.drawLine(lineLeft, lineY, lineRight, lineY);
+        }
     }
 }

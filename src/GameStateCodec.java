@@ -104,17 +104,41 @@ public class GameStateCodec {
      * already need; mouseInput/achievementToast/saveData/checkpointSaver are
      * only used for reconstructing the human seat (see PlayerArchetypeRegistry's
      * own doc for why non-human seats don't need them).
+     *
+     * Convenience overload for callers that don't need the reconstructed
+     * Human to have real hamburger-menu collaborators (every test predating
+     * ROADMAP item 10) -- delegates to the fuller overload below with a
+     * fresh default GameSettings and no-op Menu/Restart callbacks, same
+     * convenience-overload pattern Human's own constructor already
+     * establishes.
      */
     public static Reconstructed fromSnapshot(GameStateSnapshot snapshot, int width, int height, Handler handler,
                                               MouseInput mouseInput, AchievementToast achievementToast,
                                               SaveData saveData, Runnable checkpointSaver)
+            throws GameStateReconstructionException {
+        return fromSnapshot(snapshot, width, height, handler, mouseInput, achievementToast, saveData, checkpointSaver,
+                new GameSettings(), () -> {}, () -> {});
+    }
+
+    /**
+     * ROADMAP item 10: fuller overload used by Game's own snapshot-driven
+     * reconstruction paths (the Game(GameStateSnapshot) constructor and the
+     * mid-instance "Resume Game" flow off the Start Screen) so the
+     * reconstructed Human seat can actually open Settings/Menu/Restart, not
+     * just Rules/Achievements -- see Human's own fuller constructor.
+     */
+    public static Reconstructed fromSnapshot(GameStateSnapshot snapshot, int width, int height, Handler handler,
+                                              MouseInput mouseInput, AchievementToast achievementToast,
+                                              SaveData saveData, Runnable checkpointSaver, GameSettings gameSettings,
+                                              Runnable onReturnToMenu, Runnable onRestartConfirmed)
             throws GameStateReconstructionException {
         if (snapshot == null) {
             throw new GameStateReconstructionException("snapshot is null");
         }
         List<Player> players = new ArrayList<>();
         for (PlayerSnapshot ps : snapshot.players) {
-            players.add(toPlayer(ps, width, height, handler, mouseInput, achievementToast, saveData, checkpointSaver));
+            players.add(toPlayer(ps, width, height, handler, mouseInput, achievementToast, saveData, checkpointSaver,
+                    gameSettings, onReturnToMenu, onRestartConfirmed));
         }
         Round round = null;
         if (snapshot.round != null) {
@@ -124,11 +148,13 @@ public class GameStateCodec {
     }
 
     private static Player toPlayer(PlayerSnapshot ps, int width, int height, Handler handler, MouseInput mouseInput,
-                                    AchievementToast achievementToast, SaveData saveData, Runnable checkpointSaver)
+                                    AchievementToast achievementToast, SaveData saveData, Runnable checkpointSaver,
+                                    GameSettings gameSettings, Runnable onReturnToMenu, Runnable onRestartConfirmed)
             throws GameStateReconstructionException {
         Player player;
         if (Human.ARCHETYPE_ID.equals(ps.archetypeId)) {
-            player = new Human(ps.name, mouseInput, handler, achievementToast, saveData, checkpointSaver);
+            player = new Human(ps.name, mouseInput, handler, achievementToast, saveData, checkpointSaver,
+                    gameSettings, onReturnToMenu, onRestartConfirmed);
         } else {
             Function<String, Player> factory = PlayerArchetypeRegistry.lookup(ps.archetypeId);
             if (factory == null) {

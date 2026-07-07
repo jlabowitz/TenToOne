@@ -1,5 +1,9 @@
 import org.junit.Test;
 
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -224,5 +228,95 @@ public class TestStartScreen {
         screen.typeChar('Q');
         assertEquals(StartScreen.MAX_NAME_LENGTH, screen.getName().length());
         assertTrue(screen.getName().endsWith("Q"));
+    }
+
+    // --- ROADMAP item 10: Resume Game button ---
+
+    private static final int RESUME_TOP = 460;
+    private static final int RESUME_BOTTOM = 494;
+    private static final int RESUME_LEFT = 340;
+    private static final int RESUME_RIGHT = 500;
+
+    @Test
+    public void resumeControlIsNullWhenNoResumableGameExists() {
+        // Both the 3-arg (implicitly false) and the explicit-false 4-arg
+        // overload must behave identically -- neither offers Resume.
+        StartScreen screen = new StartScreen(5, 50, 2);
+        assertNull(screen.controlAt(420, 475));
+        StartScreen screenExplicit = new StartScreen(5, 50, 2, false);
+        assertNull(screenExplicit.controlAt(420, 475));
+    }
+
+    @Test
+    public void clickInsideResumeReturnsResumeWhenResumableGameExists() {
+        StartScreen screen = new StartScreen(5, 50, 2, true);
+        assertEquals(StartScreen.Control.RESUME, screen.controlAt(420, 475));
+    }
+
+    @Test
+    public void resumeLeftAndTopBoundaryIsInclusive() {
+        StartScreen screen = new StartScreen(5, 50, 2, true);
+        assertEquals(StartScreen.Control.RESUME, screen.controlAt(RESUME_LEFT, RESUME_TOP));
+    }
+
+    @Test
+    public void resumeRightAndBottomBoundaryIsExclusive() {
+        StartScreen screen = new StartScreen(5, 50, 2, true);
+        assertNull(screen.controlAt(RESUME_RIGHT, 475));
+        assertNull(screen.controlAt(420, RESUME_BOTTOM));
+        assertEquals(StartScreen.Control.RESUME, screen.controlAt(RESUME_RIGHT - 1, RESUME_BOTTOM - 1));
+    }
+
+    @Test
+    public void clickAboveOrBelowResumeReturnsNull() {
+        StartScreen screen = new StartScreen(5, 50, 2, true);
+        assertNull(screen.controlAt(420, RESUME_TOP - 1));
+        assertNull(screen.controlAt(420, RESUME_BOTTOM));
+    }
+
+    /**
+     * Explicit non-collision proof against the two regions Resume sits
+     * between: the stats line's rendered text (baseline STATS_Y=430) must
+     * clear Resume's top edge, and Resume's bottom edge must clear the
+     * footer's rendered text (baseline FOOTER_Y=560) -- measured via headless
+     * FontMetrics against the actual rendered strings, not eyeballed. Mirrors
+     * this class's own documented MAX_NAME_LENGTH measurement convention.
+     */
+    @Test
+    public void resumeButtonClearsStatsLineAndFooterText() {
+        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics g = image.getGraphics();
+        FontMetrics metrics = g.getFontMetrics();
+
+        int statsBaselineY = 430;
+        int statsBottomExtent = statsBaselineY + metrics.getDescent();
+        assertTrue("Resume's top edge (y=" + RESUME_TOP + ") must clear the stats line's bottom extent ("
+                        + statsBottomExtent + ")",
+                RESUME_TOP >= statsBottomExtent);
+
+        int footerBaselineY = 560;
+        int footerTopExtent = footerBaselineY - metrics.getAscent();
+        assertTrue("Resume's bottom edge (y=" + RESUME_BOTTOM + ") must clear the footer text's top extent ("
+                        + footerTopExtent + ")",
+                RESUME_BOTTOM <= footerTopExtent);
+
+        g.dispose();
+    }
+
+    /**
+     * Non-collision proof against the Achievements button directly above it
+     * (ACHIEVEMENTS_TOP/BOTTOM = 370/404) -- same rectsOverlap technique
+     * TestBetStepper/TestNextTrickPrompt already use for their own hotspots.
+     */
+    @Test
+    public void resumeButtonDoesNotOverlapAchievementsButton() {
+        assertFalse(rectsOverlap(RESUME_LEFT, RESUME_TOP, RESUME_RIGHT, RESUME_BOTTOM,
+                ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM));
+    }
+
+    /** Half-open rect intersection test: true iff [aLeft,aRight)x[aTop,aBottom) and [bLeft,bRight)x[bTop,bBottom) share any pixel. */
+    private static boolean rectsOverlap(int aLeft, int aTop, int aRight, int aBottom,
+                                         int bLeft, int bTop, int bRight, int bBottom) {
+        return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
     }
 }

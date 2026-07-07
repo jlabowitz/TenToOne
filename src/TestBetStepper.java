@@ -237,4 +237,60 @@ public class TestBetStepper {
                                          int bLeft, int bTop, int bRight, int bBottom) {
         return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
     }
+
+    // ROADMAP item 10: hamburger-menu icon hotspot, top-left corner --
+    // duplicated (not shared) across BetStepper/IllegalPlayFeedback/
+    // NextTrickPrompt. Moved to the very top of the canvas (was y=[60,90))
+    // per user feedback. See TestHamburgerIconGeometry for the deeper
+    // cross-class clearance proof against the AI seat row/trump card, and
+    // the documented AchievementToast-dismiss-band trade-off.
+    private static final int HAMBURGER_LEFT = 10;
+    private static final int HAMBURGER_RIGHT = 40;
+    private static final int HAMBURGER_TOP = 5;
+    private static final int HAMBURGER_BOTTOM = 35;
+
+    @Test
+    public void clickInsideHamburgerHotspotReturnsTrue() {
+        BetStepper stepper = new BetStepper(10);
+        assertTrue(stepper.isHamburgerHotspot(20, 20));
+    }
+
+    @Test
+    public void hamburgerHotspotLeftAndTopBoundaryIsInclusive() {
+        BetStepper stepper = new BetStepper(10);
+        assertTrue(stepper.isHamburgerHotspot(HAMBURGER_LEFT, HAMBURGER_TOP));
+    }
+
+    @Test
+    public void hamburgerHotspotRightAndBottomBoundaryIsExclusive() {
+        BetStepper stepper = new BetStepper(10);
+        assertFalse(stepper.isHamburgerHotspot(HAMBURGER_RIGHT, 20));
+        assertFalse(stepper.isHamburgerHotspot(20, HAMBURGER_BOTTOM));
+        assertTrue(stepper.isHamburgerHotspot(HAMBURGER_RIGHT - 1, HAMBURGER_BOTTOM - 1));
+    }
+
+    @Test
+    public void clickOutsideHamburgerHotspotReturnsFalse() {
+        BetStepper stepper = new BetStepper(10);
+        assertFalse(stepper.isHamburgerHotspot(HAMBURGER_LEFT - 1, 20));
+        assertFalse(stepper.isHamburgerHotspot(20, HAMBURGER_TOP - 1));
+        // doesn't collide with this class's own DECREMENT/VALUE/INCREMENT/BET row
+        assertFalse(stepper.isHamburgerHotspot(20, 600));
+    }
+
+    /**
+     * Explicit non-collision proof: the hamburger hotspot must not intersect
+     * the Rules box, the Achievements box, or this class's own control row --
+     * this codebase has a documented history of exactly this kind of overlay-
+     * button pixel collision bug (see ROADMAP.md).
+     */
+    @Test
+    public void hamburgerHotspotDoesNotOverlapRulesOrAchievementsOrControlRow() {
+        assertFalse(rectsOverlap(HAMBURGER_LEFT, HAMBURGER_TOP, HAMBURGER_RIGHT, HAMBURGER_BOTTOM,
+                RULES_LEFT, RULES_TOP, RULES_RIGHT, RULES_BOTTOM));
+        assertFalse(rectsOverlap(HAMBURGER_LEFT, HAMBURGER_TOP, HAMBURGER_RIGHT, HAMBURGER_BOTTOM,
+                ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM));
+        assertFalse(rectsOverlap(HAMBURGER_LEFT, HAMBURGER_TOP, HAMBURGER_RIGHT, HAMBURGER_BOTTOM,
+                620, TOP, 800, BOTTOM));
+    }
 }

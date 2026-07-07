@@ -28,7 +28,7 @@ import java.awt.*;
  * write-one-thread/read-another-thread convention).
  */
 public class StartScreen extends GameObject implements TypingTarget {
-    public enum Control { RULES, START, ACHIEVEMENTS }
+    public enum Control { RULES, START, ACHIEVEMENTS, RESUME }
 
     /**
      * Verified via actual FontMetrics measurement, not the design spec's
@@ -78,6 +78,18 @@ public class StartScreen extends GameObject implements TypingTarget {
     /** ROADMAP item 2: the "Best score / best win streak / games played" summary line, only shown once gamesPlayed > 0. */
     private static final int STATS_Y = 430;
 
+    /**
+     * ROADMAP item 10: Resume Game button, shown only when a resumable saved
+     * game exists (see hasResumableGame ctor param below). Sits in the gap
+     * between the stats line (STATS_Y=430) and the footer (FOOTER_Y=560) --
+     * same horizontal band as the Achievements button (340..500, centered on
+     * the 840-wide canvas) for visual consistency. Clearance verified via
+     * headless FontMetrics against both the stats line's text height and the
+     * footer's baseline, not eyeballed -- see TestStartScreen.
+     */
+    private static final int RESUME_TOP = 460, RESUME_BOTTOM = 494;
+    private static final int RESUME_LEFT = 340, RESUME_RIGHT = 500;
+
     private static final int FOOTER_Y = 560;
 
     /** ~0.5s at 60 ticks/sec -- matches IllegalPlayFeedback/BetStepper's tick-rate assumption. */
@@ -98,14 +110,23 @@ public class StartScreen extends GameObject implements TypingTarget {
     private final int highScore;
     private final int bestWinStreakEver;
 
+    /** ROADMAP item 10: gates both the Resume button's rendering and its click-eligibility -- see RESUME_* fields' doc. */
+    private final boolean hasResumableGame;
+
     public StartScreen() {
         this(0, 0, 0);
     }
 
     public StartScreen(int gamesPlayed, int highScore, int bestWinStreakEver) {
+        this(gamesPlayed, highScore, bestWinStreakEver, false);
+    }
+
+    /** ROADMAP item 10: new overload -- hasResumableGame controls whether the Resume Game button shows/is clickable. */
+    public StartScreen(int gamesPlayed, int highScore, int bestWinStreakEver, boolean hasResumableGame) {
         this.gamesPlayed = gamesPlayed;
         this.highScore = highScore;
         this.bestWinStreakEver = bestWinStreakEver;
+        this.hasResumableGame = hasResumableGame;
     }
 
     /** True once there's at least one recorded game to summarize -- gates the stat line's visibility. */
@@ -117,6 +138,8 @@ public class StartScreen extends GameObject implements TypingTarget {
      * Returns the control at pixel (px, py), or null if the point hits no
      * control (the name field itself, a gap, or outside every button
      * entirely). Half-open rects, same convention as BetStepper.controlAt.
+     * RESUME is only ever returned when hasResumableGame is true -- a
+     * not-rendered button must not still be secretly clickable.
      */
     public Control controlAt(int px, int py) {
         if (px >= RULES_LEFT && px < RULES_RIGHT && py >= RULES_TOP && py < RULES_BOTTOM) {
@@ -127,6 +150,9 @@ public class StartScreen extends GameObject implements TypingTarget {
         }
         if (px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT && py >= ACHIEVEMENTS_TOP && py < ACHIEVEMENTS_BOTTOM) {
             return Control.ACHIEVEMENTS;
+        }
+        if (hasResumableGame && px >= RESUME_LEFT && px < RESUME_RIGHT && py >= RESUME_TOP && py < RESUME_BOTTOM) {
+            return Control.RESUME;
         }
         return null;
     }
@@ -218,6 +244,12 @@ public class StartScreen extends GameObject implements TypingTarget {
                     + " · Best win streak: " + bestWinStreakEver
                     + " · Games played: " + gamesPlayed;
             drawCentered(g, stats, STATS_Y);
+        }
+
+        if (hasResumableGame) {
+            g.setColor(Color.BLACK);
+            g.drawRect(RESUME_LEFT, RESUME_TOP, RESUME_RIGHT - RESUME_LEFT - 1, RESUME_BOTTOM - RESUME_TOP - 1);
+            drawCenteredIn(g, "Resume Game", RESUME_LEFT, RESUME_RIGHT, RESUME_BOTTOM - 10);
         }
 
         g.setColor(Color.BLACK);
