@@ -17,6 +17,26 @@ public class Round {
      */
     private Trick currentTrick;
 
+    /**
+     * Bug fix (user-reported, live playthrough): true once the trump card and
+     * the human's Hand have been added to the handler -- guards
+     * renderTrumpCard()/renderPlayerHand() in bet() below against running a
+     * second time. Without this, a checkpoint taken mid-betting-phase (before
+     * every player has bet) resumes into a Round whose reconstruction
+     * constructor already added both (so betting has something to render),
+     * and Game.playOneRound()'s mid-betting-resume branch then calls bet()
+     * again -- which unconditionally re-ran both render calls, double-adding
+     * the same Hand/trump-card instances to the Handler. Harmless-looking on
+     * its own (same instance, same layout, same pixels), but
+     * Handler.removeObject only strips a single occurrence per call, so the
+     * *next* Menu click's cleanup left one stale duplicate registered
+     * forever -- which then rendered its own increasingly-stale card set on
+     * top of whatever hand replaced it, reading on screen as "too many
+     * cards". The normal (non-resumed) flow calls bet() exactly once per
+     * round, so this guard is a no-op there.
+     */
+    private boolean handAndTrumpCardRendered;
+
     private final int WIDTH, HEIGHT;
     private final Handler handler;
 
@@ -89,6 +109,7 @@ public class Round {
         positionHumanHand();
         renderTrumpCard();
         renderPlayerHand();
+        handAndTrumpCardRendered = true;
         initializeTrickLeader();
     }
 
@@ -159,8 +180,15 @@ public class Round {
      * getHand().getNumCards().
      */
     public void bet(int currentPlayer, GameSettings gameSettings) {
-        renderTrumpCard();
-        renderPlayerHand();
+        //Bug fix (see handAndTrumpCardRendered's own doc): a resumed round
+        //whose reconstruction constructor already rendered both must not
+        //re-render them here -- Game.playOneRound()'s mid-betting-resume
+        //branch calls bet() again on exactly such a round.
+        if (!handAndTrumpCardRendered) {
+            renderTrumpCard();
+            renderPlayerHand();
+            handAndTrumpCardRendered = true;
+        }
         for (Player player : players) {
             player.resetBet();
         }

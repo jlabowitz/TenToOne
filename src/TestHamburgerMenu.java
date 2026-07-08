@@ -13,6 +13,11 @@ import static org.junit.Assert.assertTrue;
  * confirmation flow. Uses the same background-thread-delivers-clicks pattern
  * every other showBlocking test in this codebase uses (see
  * TestRulesView/TestHumanBet).
+ *
+ * ROADMAP item 10 follow-up: rewritten for the new single-column (1x6) layout
+ * and reordered menu items (Pause, Rules, Settings, Achievements, Restart
+ * Game, Go to Menu) -- see HamburgerMenu's own class doc for why the earlier
+ * 3x2 grid was replaced.
  */
 public class TestHamburgerMenu {
 
@@ -24,7 +29,7 @@ public class TestHamburgerMenu {
 
         Thread clicker = new Thread(() -> {
             sleep50();
-            deliverClick(mouseInput, 30, 20); // row 0, col 0: Rules
+            deliverClick(mouseInput, 30, 50); // row 1: Rules
         });
         clicker.start();
 
@@ -67,15 +72,15 @@ public class TestHamburgerMenu {
         // Directly exercise the item-picking behavior without threading a
         // background clicker for the confirmation-state assertions below --
         // itemAt() is public and can be checked directly against a fresh
-        // instance's known geometry: a 3-col x 2-row grid (GRID_LEFT=20,
-        // COL_WIDTH=100, ROW_TOP=11, ROW_HEIGHT=18). Restart is index 4
-        // (row 1, col 1), spanning x=[120,220), y=[29,47).
-        assertEquals(HamburgerMenu.Selection.RESTART, menu.itemAt(130, 35));
+        // instance's known geometry: single column, GRID_LEFT=20,
+        // ROW_WIDTH=130, ROW_TOP=11, ROW_HEIGHT=30. "Restart Game" is row 4,
+        // spanning y=[131,161).
+        assertEquals(HamburgerMenu.Selection.RESTART, menu.itemAt(30, 145));
 
         Thread clicker = new Thread(() -> {
             sleep50();
-            deliverClick(mouseInput, 130, 35); // Restart (row 1, col 1)
-            deliverClick(mouseInput, 150, 25); // Yes
+            deliverClick(mouseInput, 30, 145); // Restart Game (row 4)
+            deliverClick(mouseInput, 350, 340); // Yes
         });
         clicker.start();
 
@@ -93,8 +98,8 @@ public class TestHamburgerMenu {
 
         Thread clicker = new Thread(() -> {
             sleep50();
-            deliverClick(mouseInput, 130, 35); // Restart (row 1, col 1)
-            deliverClick(mouseInput, 230, 25); // No
+            deliverClick(mouseInput, 30, 145); // Restart Game (row 4)
+            deliverClick(mouseInput, 470, 340); // No
         });
         clicker.start();
 
@@ -117,7 +122,7 @@ public class TestHamburgerMenu {
         Thread clicker = new Thread(() -> {
             sleep50();
             deliverClick(mouseInput, 400, 20); // inside the toast's dismiss band
-            deliverClick(mouseInput, 30, 20); // row 0, col 0: Rules
+            deliverClick(mouseInput, 30, 50); // row 1: Rules
         });
         clicker.start();
 

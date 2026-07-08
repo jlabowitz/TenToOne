@@ -9,21 +9,25 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * ROADMAP item 10 (user-feedback pass): the deeper, cross-class clearance
- * proof for the hamburger icon's shared geometry, now that it's been moved
- * to the very top of the canvas -- HAMBURGER_LEFT/RIGHT/TOP/BOTTOM =
- * 10/40/5/35 (was 10/40/60/90), duplicated identically across BetStepper/
+ * proof for the hamburger icon's shared *closed* geometry -- HAMBURGER_LEFT/
+ * RIGHT/TOP/BOTTOM = 10/40/5/35, duplicated identically across BetStepper/
  * IllegalPlayFeedback/NextTrickPrompt (see each class's own per-class
- * hotspot tests in TestBetStepper/TestIllegalPlayFeedback/TestNextTrickPrompt),
- * plus HamburgerMenu's own open-dropdown panel (PANEL_TOP=5/PANEL_BOTTOM=50,
- * a superset of the closed icon's rect on every edge -- see below).
+ * hotspot tests in TestBetStepper/TestIllegalPlayFeedback/TestNextTrickPrompt).
  *
- * Three regions this geometry must clear, algebraically proven (not
- * eyeballed) across every supported player count (1-4 AI opponents, i.e.
- * 2-5 total players -- Game asserts numPlayers() &lt;= 5):
+ * ROADMAP item 10 follow-up: this file's scope narrowed since it was first
+ * written. The *open dropdown panel* no longer has a clearance proof here --
+ * HamburgerMenu moved to a single vertical column (1x6) per the user's
+ * explicit override of this file's own original 3x2-grid rationale, and the
+ * user explicitly accepted that the open panel now overlaps the AI seat
+ * row/message band/trump card while showing (see
+ * openDropdownNowOverlapsAiSeatRowNameTextAcceptedTradeoff below, which
+ * documents that overlap the same way
+ * hamburgerIconNowOverlapsAchievementToastDismissBandAcceptedTradeoff already
+ * documents the toast-band one). Only the *closed* icon still needs to clear
+ * the AI seat row -- that's what the remaining three constraints below prove:
  *
  * 1. The AI seat row's own name/card/score text (Game.AI_ROW_Y, shared by
- *    every AI seat regardless of count) -- both the icon (closed) and the
- *    full open dropdown panel must clear it.
+ *    every AI seat regardless of count) -- the closed icon must clear it.
  * 2. The trump card's footprint (Round.renderTrumpCard(): x=50,y=HEIGHT/2,
  *    +/-10px border) -- the AI seat row's played-card position must stay
  *    clear of it.
@@ -34,7 +38,7 @@ import static org.junit.Assert.assertTrue;
  *    see that field's own doc.
  *
  * These three constraints are in real tension (moving the AI row down helps
- * clear the hamburger dropcheck above, but pushes it toward the message
+ * clear the closed hamburger icon above, but pushes it toward the message
  * band/trump card below) -- this file is the algebraic proof that the
  * chosen numbers (HAMBURGER_TOP=5, Game.AI_ROW_Y=70) satisfy all three
  * simultaneously, not just "look fine" in one screenshot.
@@ -51,8 +55,8 @@ public class TestHamburgerIconGeometry {
     // the real class below via its public isInsidePanel()/itemAt() methods,
     // so a drift between these literals and the production constants is
     // caught rather than silently assumed.
-    private static final int PANEL_LEFT = 10, PANEL_RIGHT = 330;
-    private static final int PANEL_TOP = 5, PANEL_BOTTOM = 50;
+    private static final int PANEL_LEFT = 10, PANEL_RIGHT = 160;
+    private static final int PANEL_TOP = 5, PANEL_BOTTOM = 197;
 
     // Card geometry (Card.java): WIDTH/HEIGHT are public; BORDER (trump
     // highlight) and the high-card ring's max offset are private, duplicated
@@ -160,31 +164,29 @@ public class TestHamburgerIconGeometry {
     }
 
     /**
-     * Constraint 1: the hamburger dropdown's bottom edge must clear the AI
-     * seat row's name text -- its topmost rendered element (Player.render's
-     * AI branch draws the name at baseline y=Game.AI_ROW_Y, with the rest of
-     * that seat's HUD text below it). Since every AI seat shares this same y
-     * (Game.renderPlayers()), this single check covers every seat at every
-     * player count -- unlike the card check below, this doesn't depend on
-     * the AI's name string width (arbitrary/user-set), so it's checked
-     * purely on y, which is the only thing that can be relied on generically.
+     * ROADMAP item 10 follow-up: the single-column dropdown (PANEL_BOTTOM=197)
+     * is now tall enough that it no longer clears the AI seat row's name text
+     * -- an accepted trade-off of the user's explicit single-column override,
+     * not an oversight. This test locks in that the overlap is real (mirrors
+     * hamburgerIconNowOverlapsAchievementToastDismissBandAcceptedTradeoff's
+     * own "assert the accepted trade-off instead of stale clearance" shape)
+     * rather than silently deleting the coverage. The *closed* icon's own
+     * clearance (a real requirement, unchanged) is proven separately by
+     * closedIconClearsAiSeatRowNameTextAtEveryPlayerCount below.
      */
     @Test
-    public void openDropdownClearsAiSeatRowNameTextAtEveryPlayerCount() {
+    public void openDropdownNowOverlapsAiSeatRowNameTextAcceptedTradeoff() {
         FontMetrics metrics = defaultFontMetrics();
         int nameTop = Game.AI_ROW_Y - metrics.getAscent();
-        assertTrue("dropdown bottom (" + PANEL_BOTTOM + ") must clear the AI row's name-text top ("
-                        + nameTop + ") for every player count (all AI seats share Game.AI_ROW_Y)",
-                PANEL_BOTTOM <= nameTop);
+        assertTrue("dropdown bottom (" + PANEL_BOTTOM + ") is expected to now overlap the AI row's "
+                        + "name-text top (" + nameTop + ") -- see this test's own doc",
+                PANEL_BOTTOM > nameTop);
     }
 
     /**
-     * Same as above, for the closed icon specifically (a subset of the open
-     * panel's rect on every edge -- PANEL_TOP=HAMBURGER_TOP and
-     * PANEL_BOTTOM &gt; HAMBURGER_BOTTOM, PANEL_RIGHT &gt; HAMBURGER_RIGHT --
-     * so clearing the panel implies clearing the icon too, but this is kept
-     * as its own explicit check per the brief's ask for "closed, and the
-     * full open dropdown" separately).
+     * The closed icon itself (unchanged by the single-column dropdown
+     * override) must still clear the AI seat row's name text -- this is the
+     * one real, still-binding requirement this file exists to prove.
      */
     @Test
     public void closedIconClearsAiSeatRowNameTextAtEveryPlayerCount() {

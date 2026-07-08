@@ -205,7 +205,7 @@ public class Game extends Canvas implements Runnable{
                 //renderPlayers() call, stacked on top of play()'s own
                 //unconditional first-thing renderPlayers() call moments
                 //later, double-registered every Player with the Handler
-                //(exactly the trap this constructor's own comment above
+                //(exactly the trap this constructor's own comment above 
                 //already warned about, but didn't actually avoid). roundIndex/
                 //currentRound/roundsHitBonusThisGame/wasSoleLastAtHalfway are
                 //already at their correct just-constructed defaults here, so
@@ -422,6 +422,7 @@ public class Game extends Canvas implements Runnable{
         StartScreen startScreen = new StartScreen(saveData.gamesPlayed, saveData.highScore,
                 saveData.bestWinStreakEver, resumable);
         handler.addObject(startScreen);
+        InteractionLog.logShown("StartScreen");
         keyInput.setTarget(startScreen);
         this.requestFocusInWindow();
         try {
@@ -430,8 +431,10 @@ public class Game extends Canvas implements Runnable{
                 Point click = mouseInput.awaitClick();
                 StartScreen.Control control = startScreen.controlAt(click.x, click.y);
                 if (control == null) {
+                    InteractionLog.logClick(click.x, click.y, "no control matched (StartScreen)");
                     continue;
                 }
+                InteractionLog.logClick(click.x, click.y, "StartScreen." + control);
                 switch (control) {
                     case RULES:
                         RulesView.showBlocking(handler, mouseInput, achievementToast);
@@ -439,6 +442,10 @@ public class Game extends Canvas implements Runnable{
                         continue;
                     case ACHIEVEMENTS:
                         AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
+                        mouseInput.clearClicks();
+                        continue;
+                    case SETTINGS:
+                        SettingsView.showBlocking(handler, mouseInput, achievementToast, gameSettings);
                         mouseInput.clearClicks();
                         continue;
                     case RESUME:
@@ -608,21 +615,39 @@ public class Game extends Canvas implements Runnable{
      * either recovery path re-adds a fresh or reconstructed player list via
      * renderPlayers() -- otherwise every player's tick()/render() would fire
      * twice a frame), plus the in-progress round's trump card and the
-     * human's Hand object, if either exists. Deliberately does NOT chase any
-     * already-played-this-trick stray Card objects still registered with the
-     * handler -- a known, pre-existing, accepted leak (ROADMAP item 16), not
-     * newly introduced or expanded by this method. Package-private (not
-     * private), mirroring this class's existing testability-seam convention,
-     * so TestGame can exercise this cleanup step directly.
+     * human's Hand object, if either exists. Package-private (not private),
+     * mirroring this class's existing testability-seam convention, so
+     * TestGame can exercise this cleanup step directly.
+     *
+     * Bug fix (user-reported, live playthrough, 2026-07-07): also strips
+     * every still-registered Trick-played Card object -- previously left
+     * alone here on the strength of this method's own now-stale comment
+     * ("a known, pre-existing, accepted leak, ROADMAP item 16"), which
+     * turned out to describe only the trump-card/hand half of that item
+     * ("practically negligible, no visible symptom" per its own writeup),
+     * not this half. Trick.play() registers each played Card directly with
+     * the Handler and only ever removes them via Round.playRound()'s
+     * handler.removeAll(cardsPlayed), reached once currentTrick.play()
+     * returns *normally* -- but Menu/Restart confirmed from inside a
+     * blocking Human.playCard() click-loop mid-trick throws
+     * ReturnToMenuSignal/RestartGameSignal straight out of that loop,
+     * unwinding past playRound()'s post-trick cleanup entirely. Left
+     * unfixed, any seat that had already played this trick stays registered
+     * with the Handler forever, rendering on top of every later screen --
+     * including, if it happened to be this trick's running-highest card,
+     * its gold high-card ring. The trump card and every Trick-played card
+     * are the only two kinds of bare Card ever independently registered
+     * with this Handler (a Hand's own cards are never registered
+     * individually -- see Hand.render(), which iterates its own internal
+     * list), so removing every still-registered Card here is exactly the
+     * right scope -- this folds the previously-separate explicit trump-card
+     * removal into the same pass.
      */
     void cleanupHandlerForMenuOrRestart() {
         for (Player player : getPlayers()) {
             handler.removeObject(player);
         }
-        Card trumpCard = currentRound != null ? currentRound.getTrumpCard() : null;
-        if (trumpCard != null) {
-            handler.removeObject(trumpCard);
-        }
+        handler.removeAllOfType(Card.class);
         getPlayers().stream()
                 .filter(player -> player.getID() == ID.HUMAN)
                 .findFirst()
@@ -745,6 +770,10 @@ public class Game extends Canvas implements Runnable{
      * real clicks through the full Start Screen.
      */
     void establishFreshGameState(String humanName) {
+        //ROADMAP item 10 follow-up: see restartForNewGame()'s identical call
+        //for why this belongs here too -- both are "a genuinely fresh game is
+        //starting" moments (see GameSettings' own class doc).
+        gameSettings.applyPending();
         gameStateStore.clear();
         players.clear();
         players.addAll(buildPlayers(aiNames, humanName));
@@ -1019,6 +1048,13 @@ public class Game extends Canvas implements Runnable{
      * without driving play()'s full click-driven loop.
      */
     void restartForNewGame() {
+        //ROADMAP item 10 follow-up: apply any Settings changes staged since
+        //the last game started -- this is one of the two places (along with
+        //establishFreshGameState()) Game.java establishes a genuinely fresh
+        //game's starting state, so this is where a pending toggle actually
+        //takes effect. See GameSettings' own class doc for why this can't
+        //just be applied live at toggle time.
+        gameSettings.applyPending();
         //design/persistent-game-state.md Phase 8: the one other real
         //explicit-restart code path in this codebase -- cheap/idempotent
         //even though play()'s own game-end clear (right before this method's
@@ -1355,6 +1391,23 @@ public class Game extends Canvas implements Runnable{
 
 
     public static void main(String[] args) {
+        // InteractionLog: log the session boundary as early/cleanly as
+        // possible -- before any Game/Window construction, right at the real
+        // process entry point (see InteractionLog's own doc). The matching
+        // "shutting down" line is a JVM shutdown hook, not a call at the
+        // bottom of this method -- this process never actually returns from
+        // game.play() below (Window.java deliberately sets
+        // JFrame.EXIT_ON_CLOSE, an accepted design choice this change does
+        // not touch), so a shutdown hook is the only way to observe the
+        // window-close moment at all. Registered here (not inside Window/
+        // Game) so it fires for exactly one real boot, not once per test
+        // Game/Window construction. ENABLED defaults to false (see
+        // InteractionLog's own doc) so JUnit's direct construction of UI
+        // classes stays inert; flip it on here, right at the one real
+        // process entry point, before the first log call.
+        InteractionLog.ENABLED = true;
+        InteractionLog.logEvent("booting up");
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> InteractionLog.logEvent("shutting down")));
         Game game = new Game(names);
         game.play();
     }

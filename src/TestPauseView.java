@@ -10,8 +10,18 @@ import static org.junit.Assert.assertTrue;
  * ROADMAP item 10: wiring test for PauseView.showBlocking's Resume button
  * and toast-dismiss precedence, same pattern as every other showBlocking
  * test in this codebase (see TestRulesView).
+ *
+ * ROADMAP item 10 follow-up: PauseView shrank to a small centered dialog
+ * (300x160, centered on the 840x630 canvas) and gained click-outside-
+ * dismiss (mirroring HamburgerMenu's own miss-click convention) -- the
+ * earlier Resume-only dismiss meant a miss-click looped forever. Resume's
+ * geometry moved accordingly (PANEL_X=270, PANEL_Y=235; Resume at
+ * x=[330,450), y=[339,375)).
  */
 public class TestPauseView {
+
+    private static final int RESUME_LEFT = 330, RESUME_RIGHT = 450;
+    private static final int RESUME_TOP = 339, RESUME_BOTTOM = 375;
 
     @Test(timeout = 5000)
     public void resumeButtonResolvesTheBlockingCall() throws InterruptedException {
@@ -21,13 +31,52 @@ public class TestPauseView {
 
         Thread clicker = new Thread(() -> {
             sleep50();
-            deliverClick(mouseInput, 700, 590); // Resume button (same geometry as RulesView's Back)
+            deliverClick(mouseInput, 390, 350); // Resume button
         });
         clicker.start();
 
         PauseView.showBlocking(handler, mouseInput, toast);
         clicker.join();
         // no exception / hang -- showBlocking returned, proving the Resume click resolved it
+    }
+
+    @Test(timeout = 5000)
+    public void clickOutsidePanelResolvesTheBlockingCall() throws InterruptedException {
+        Handler handler = new Handler();
+        MouseInput mouseInput = new MouseInput();
+        AchievementToast toast = new AchievementToast();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 700, 590); // well outside the new, smaller centered panel
+        });
+        clicker.start();
+
+        PauseView.showBlocking(handler, mouseInput, toast);
+        clicker.join();
+        // no exception / hang -- showBlocking returned, proving the miss-click still resolved it
+    }
+
+    @Test
+    public void isResumeButtonReflectsTheNewCenteredGeometry() {
+        PauseView view = new PauseView();
+        assertTrue(view.isResumeButton(RESUME_LEFT, RESUME_TOP));
+        assertTrue(view.isResumeButton(RESUME_RIGHT - 1, RESUME_BOTTOM - 1));
+        assertTrue(!view.isResumeButton(RESUME_LEFT - 1, RESUME_TOP));
+        assertTrue(!view.isResumeButton(RESUME_LEFT, RESUME_TOP - 1));
+        assertTrue(!view.isResumeButton(RESUME_RIGHT, RESUME_TOP));
+        assertTrue(!view.isResumeButton(RESUME_LEFT, RESUME_BOTTOM));
+    }
+
+    @Test
+    public void isInsidePanelReflectsTheNewCenteredBounds() {
+        PauseView view = new PauseView();
+        assertTrue(view.isInsidePanel(270, 235));
+        assertTrue(view.isInsidePanel(569, 394));
+        assertTrue(!view.isInsidePanel(269, 235));
+        assertTrue(!view.isInsidePanel(270, 234));
+        assertTrue(!view.isInsidePanel(570, 235));
+        assertTrue(!view.isInsidePanel(270, 395));
     }
 
     @Test(timeout = 5000)
@@ -43,7 +92,7 @@ public class TestPauseView {
         Thread clicker = new Thread(() -> {
             sleep50();
             deliverClick(mouseInput, 400, 20); // inside the toast's dismiss band
-            deliverClick(mouseInput, 700, 590); // Resume
+            deliverClick(mouseInput, 390, 350); // Resume
         });
         clicker.start();
 

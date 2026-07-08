@@ -46,6 +46,46 @@ public class TestAchievementsView {
         assertFalse(view.isBackButton(400, 300));
     }
 
+    // ROADMAP item 10 follow-up: click-outside-dismiss, mirroring
+    // HamburgerMenu/PauseView's own miss-click convention -- this panel's own
+    // layout is unchanged (PANEL_X/Y/W/H=40/20/760/590), only this new
+    // dismiss behavior was added.
+    private static final int PANEL_LEFT = 40, PANEL_TOP = 20;
+    private static final int PANEL_RIGHT = 800, PANEL_BOTTOM = 610;
+
+    @Test
+    public void isInsidePanelReflectsTheUnchangedFullCanvasBounds() {
+        AchievementsView view = new AchievementsView(SaveData.defaults());
+        assertTrue(view.isInsidePanel(PANEL_LEFT, PANEL_TOP));
+        assertTrue(view.isInsidePanel(PANEL_RIGHT - 1, PANEL_BOTTOM - 1));
+        assertFalse(view.isInsidePanel(PANEL_LEFT - 1, PANEL_TOP));
+        assertFalse(view.isInsidePanel(PANEL_LEFT, PANEL_TOP - 1));
+        assertFalse(view.isInsidePanel(PANEL_RIGHT, PANEL_TOP));
+        assertFalse(view.isInsidePanel(PANEL_LEFT, PANEL_BOTTOM));
+    }
+
+    @Test(timeout = 5000)
+    public void clickOutsidePanelDismissesWithNoAction() throws InterruptedException {
+        Handler handler = new Handler();
+        MouseInput mouseInput = new MouseInput();
+        AchievementToast toast = new AchievementToast();
+
+        Thread clicker = new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            deliverClick(mouseInput, 820, 615); // well outside the panel
+        });
+        clicker.start();
+
+        AchievementsView.showBlocking(handler, mouseInput, SaveData.defaults(), toast);
+        clicker.join();
+        // no exception / hang -- showBlocking returned, proving the miss-click resolved it
+    }
+
     /**
      * The content-building step (visibleRows()) is exercised directly here,
      * separately from render()'s Graphics-dependent drawing, so hidden-

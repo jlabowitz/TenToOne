@@ -13,7 +13,7 @@ import static org.junit.Assert.assertTrue;
  * test file previously existed for this class -- it had no testable logic
  * before this hotspot was added). Layout contract: the hotspot covers x in
  * [340, 500), y in [460, 494), same half-open-rect convention as
- * NextTrickPrompt.isRulesHotspot/RulesView.isBackButton.
+ * NextTrickPrompt.isHamburgerHotspot/RulesView.isBackButton.
  */
 public class TestGameOverBanner {
     private static final int TOP = 460;

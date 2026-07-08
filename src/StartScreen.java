@@ -26,9 +26,23 @@ import java.awt.*;
  * KeyInput's class doc for why a plain volatile-String reassignment is
  * correct here instead of a queue (mirrors Player.trickLeader/leadingSuit's
  * write-one-thread/read-another-thread convention).
+ *
+ * ROADMAP item 10 follow-up: three-row layout, added by this pass (added the
+ * Settings button and reshuffled Resume/Rules/Achievements around it):
+ *
+ * Row 1 (y=320-354): "Resume Game" + "Start Game" side by side when a
+ * resumable saved game exists; otherwise "Start Game" alone, centered in the
+ * gap between them -- Rules does NOT move up into this row either way.
+ *
+ * Row 2 (y=370-404): "Rules" (directly under Row 1's old Rules slot) +
+ * "Achievements" to its right -- always shown, regardless of hasResumableGame.
+ *
+ * Row 3 (y=460-494): "Settings", reusing the exact slot Resume used to occupy
+ * alone (its clearance against the stats line/footer below is already proven
+ * by this class's own resumeButtonClearsStatsLineAndFooterText-style test).
  */
 public class StartScreen extends GameObject implements TypingTarget {
-    public enum Control { RULES, START, ACHIEVEMENTS, RESUME }
+    public enum Control { RULES, START, ACHIEVEMENTS, RESUME, SETTINGS }
 
     /**
      * Verified via actual FontMetrics measurement, not the design spec's
@@ -61,34 +75,29 @@ public class StartScreen extends GameObject implements TypingTarget {
     private static final int FIELD_TEXT_X = FIELD_LEFT + 10;
     private static final int FIELD_TEXT_Y = FIELD_BOTTOM - 10;
 
-    private static final int RULES_TOP = 320, RULES_BOTTOM = 354;
+    // --- Row 1 (y=320-354): Resume Game + Start Game, or Start Game alone ---
+    private static final int ROW1_TOP = 320, ROW1_BOTTOM = 354;
+
+    /** Resume's slot -- only rendered/clickable when hasResumableGame is true. */
+    private static final int RESUME_LEFT = 270, RESUME_RIGHT = 390;
+
+    /** Start's slot when Resume is also shown -- unchanged from before this pass. */
+    private static final int START_WITH_RESUME_LEFT = 450, START_WITH_RESUME_RIGHT = 570;
+
+    /** Start's slot when shown alone -- same centered width/position convention the old lone-Achievements row used. */
+    private static final int START_ALONE_LEFT = 340, START_ALONE_RIGHT = 500;
+
+    // --- Row 2 (y=370-404): Rules + Achievements, always shown ---
+    private static final int ROW2_TOP = 370, ROW2_BOTTOM = 404;
     private static final int RULES_LEFT = 270, RULES_RIGHT = 390;
-
-    private static final int START_TOP = 320, START_BOTTOM = 354;
-    private static final int START_LEFT = 450, START_RIGHT = 570;
-
-    /**
-     * ROADMAP item 2: Achievements button, its own row below Rules/Start.
-     * Width (160px) matches GameOverBanner's Play Again button for visual
-     * consistency across this project's button conventions.
-     */
-    private static final int ACHIEVEMENTS_TOP = 370, ACHIEVEMENTS_BOTTOM = 404;
-    private static final int ACHIEVEMENTS_LEFT = 340, ACHIEVEMENTS_RIGHT = 500;
+    private static final int ACHIEVEMENTS_LEFT = 410, ACHIEVEMENTS_RIGHT = 570;
 
     /** ROADMAP item 2: the "Best score / best win streak / games played" summary line, only shown once gamesPlayed > 0. */
     private static final int STATS_Y = 430;
 
-    /**
-     * ROADMAP item 10: Resume Game button, shown only when a resumable saved
-     * game exists (see hasResumableGame ctor param below). Sits in the gap
-     * between the stats line (STATS_Y=430) and the footer (FOOTER_Y=560) --
-     * same horizontal band as the Achievements button (340..500, centered on
-     * the 840-wide canvas) for visual consistency. Clearance verified via
-     * headless FontMetrics against both the stats line's text height and the
-     * footer's baseline, not eyeballed -- see TestStartScreen.
-     */
-    private static final int RESUME_TOP = 460, RESUME_BOTTOM = 494;
-    private static final int RESUME_LEFT = 340, RESUME_RIGHT = 500;
+    // --- Row 3 (y=460-494): Settings, always shown, reusing Resume's old alone-slot ---
+    private static final int ROW3_TOP = 460, ROW3_BOTTOM = 494;
+    private static final int SETTINGS_LEFT = 340, SETTINGS_RIGHT = 500;
 
     private static final int FOOTER_Y = 560;
 
@@ -139,20 +148,35 @@ public class StartScreen extends GameObject implements TypingTarget {
      * control (the name field itself, a gap, or outside every button
      * entirely). Half-open rects, same convention as BetStepper.controlAt.
      * RESUME is only ever returned when hasResumableGame is true -- a
-     * not-rendered button must not still be secretly clickable.
+     * not-rendered button must not still be secretly clickable. START's slot
+     * shifts depending on hasResumableGame (shared row with Resume vs. alone,
+     * centered).
      */
     public Control controlAt(int px, int py) {
-        if (px >= RULES_LEFT && px < RULES_RIGHT && py >= RULES_TOP && py < RULES_BOTTOM) {
-            return Control.RULES;
+        if (py >= ROW1_TOP && py < ROW1_BOTTOM) {
+            if (hasResumableGame) {
+                if (px >= RESUME_LEFT && px < RESUME_RIGHT) {
+                    return Control.RESUME;
+                }
+                if (px >= START_WITH_RESUME_LEFT && px < START_WITH_RESUME_RIGHT) {
+                    return Control.START;
+                }
+            } else {
+                if (px >= START_ALONE_LEFT && px < START_ALONE_RIGHT) {
+                    return Control.START;
+                }
+            }
         }
-        if (px >= START_LEFT && px < START_RIGHT && py >= START_TOP && py < START_BOTTOM) {
-            return Control.START;
+        if (py >= ROW2_TOP && py < ROW2_BOTTOM) {
+            if (px >= RULES_LEFT && px < RULES_RIGHT) {
+                return Control.RULES;
+            }
+            if (px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT) {
+                return Control.ACHIEVEMENTS;
+            }
         }
-        if (px >= ACHIEVEMENTS_LEFT && px < ACHIEVEMENTS_RIGHT && py >= ACHIEVEMENTS_TOP && py < ACHIEVEMENTS_BOTTOM) {
-            return Control.ACHIEVEMENTS;
-        }
-        if (hasResumableGame && px >= RESUME_LEFT && px < RESUME_RIGHT && py >= RESUME_TOP && py < RESUME_BOTTOM) {
-            return Control.RESUME;
+        if (py >= ROW3_TOP && py < ROW3_BOTTOM && px >= SETTINGS_LEFT && px < SETTINGS_RIGHT) {
+            return Control.SETTINGS;
         }
         return null;
     }
@@ -228,15 +252,22 @@ public class StartScreen extends GameObject implements TypingTarget {
         }
 
         g.setColor(Color.BLACK);
-        g.drawRect(RULES_LEFT, RULES_TOP, RULES_RIGHT - RULES_LEFT - 1, RULES_BOTTOM - RULES_TOP - 1);
-        drawCenteredIn(g, "Rules", RULES_LEFT, RULES_RIGHT, RULES_BOTTOM - 10);
+        if (hasResumableGame) {
+            g.drawRect(RESUME_LEFT, ROW1_TOP, RESUME_RIGHT - RESUME_LEFT - 1, ROW1_BOTTOM - ROW1_TOP - 1);
+            drawCenteredIn(g, "Resume Game", RESUME_LEFT, RESUME_RIGHT, ROW1_BOTTOM - 10);
 
-        g.drawRect(START_LEFT, START_TOP, START_RIGHT - START_LEFT - 1, START_BOTTOM - START_TOP - 1);
-        drawCenteredIn(g, "Start Game", START_LEFT, START_RIGHT, START_BOTTOM - 10);
+            g.drawRect(START_WITH_RESUME_LEFT, ROW1_TOP, START_WITH_RESUME_RIGHT - START_WITH_RESUME_LEFT - 1, ROW1_BOTTOM - ROW1_TOP - 1);
+            drawCenteredIn(g, "Start Game", START_WITH_RESUME_LEFT, START_WITH_RESUME_RIGHT, ROW1_BOTTOM - 10);
+        } else {
+            g.drawRect(START_ALONE_LEFT, ROW1_TOP, START_ALONE_RIGHT - START_ALONE_LEFT - 1, ROW1_BOTTOM - ROW1_TOP - 1);
+            drawCenteredIn(g, "Start Game", START_ALONE_LEFT, START_ALONE_RIGHT, ROW1_BOTTOM - 10);
+        }
 
-        g.setColor(Color.BLACK);
-        g.drawRect(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT - ACHIEVEMENTS_LEFT - 1, ACHIEVEMENTS_BOTTOM - ACHIEVEMENTS_TOP - 1);
-        drawCenteredIn(g, "Achievements", ACHIEVEMENTS_LEFT, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM - 10);
+        g.drawRect(RULES_LEFT, ROW2_TOP, RULES_RIGHT - RULES_LEFT - 1, ROW2_BOTTOM - ROW2_TOP - 1);
+        drawCenteredIn(g, "Rules", RULES_LEFT, RULES_RIGHT, ROW2_BOTTOM - 10);
+
+        g.drawRect(ACHIEVEMENTS_LEFT, ROW2_TOP, ACHIEVEMENTS_RIGHT - ACHIEVEMENTS_LEFT - 1, ROW2_BOTTOM - ROW2_TOP - 1);
+        drawCenteredIn(g, "Achievements", ACHIEVEMENTS_LEFT, ACHIEVEMENTS_RIGHT, ROW2_BOTTOM - 10);
 
         if (hasStatsToShow()) {
             g.setColor(Color.DARK_GRAY);
@@ -246,11 +277,9 @@ public class StartScreen extends GameObject implements TypingTarget {
             drawCentered(g, stats, STATS_Y);
         }
 
-        if (hasResumableGame) {
-            g.setColor(Color.BLACK);
-            g.drawRect(RESUME_LEFT, RESUME_TOP, RESUME_RIGHT - RESUME_LEFT - 1, RESUME_BOTTOM - RESUME_TOP - 1);
-            drawCenteredIn(g, "Resume Game", RESUME_LEFT, RESUME_RIGHT, RESUME_BOTTOM - 10);
-        }
+        g.setColor(Color.BLACK);
+        g.drawRect(SETTINGS_LEFT, ROW3_TOP, SETTINGS_RIGHT - SETTINGS_LEFT - 1, ROW3_BOTTOM - ROW3_TOP - 1);
+        drawCenteredIn(g, "Settings", SETTINGS_LEFT, SETTINGS_RIGHT, ROW3_BOTTOM - 10);
 
         g.setColor(Color.BLACK);
         // "16" in the design spec's illustrative copy was written against an

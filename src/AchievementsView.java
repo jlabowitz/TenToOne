@@ -59,22 +59,33 @@ public class AchievementsView extends GameObject {
      * block on clicks until the Back button is hit, remove in a finally --
      * including the same ACHIEVEMENTTOAST click-to-dismiss check ahead of
      * the Back button, for the same code-review Finding 1 reason (see
-     * RulesView.showBlocking's doc).
+     * RulesView.showBlocking's doc). ROADMAP item 10 follow-up: a click
+     * outside the panel also dismisses (with no other action), mirroring
+     * HamburgerMenu/PauseView's own miss-click convention -- this panel's own
+     * layout/content is unchanged, only this dismiss behavior is new.
      */
     public static void showBlocking(Handler handler, MouseInput mouseInput, SaveData saveData, AchievementToast achievementToast) {
         AchievementsView view = new AchievementsView(saveData);
         handler.addObject(view);
+        InteractionLog.logShown("AchievementsView");
         try {
             mouseInput.clearClicks();
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "AchievementToast (dismiss)");
                     achievementToast.dismiss();
                     continue;
                 }
                 if (view.isBackButton(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "AchievementsView.Back");
                     return;
                 }
+                if (!view.isInsidePanel(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "outside-panel dismiss (AchievementsView)");
+                    return;
+                }
+                InteractionLog.logClick(click.x, click.y, "no control matched (AchievementsView)");
             }
         } finally {
             handler.removeObject(view);
@@ -84,6 +95,11 @@ public class AchievementsView extends GameObject {
     /** Half-open rect hit-test, same convention/geometry as RulesView.isBackButton. */
     public boolean isBackButton(int px, int py) {
         return px >= BACK_LEFT && px < BACK_RIGHT && py >= BACK_TOP && py < BACK_BOTTOM;
+    }
+
+    /** Half-open rect hit-test for the panel itself, used to distinguish an inert click on the panel from a true miss-click. */
+    public boolean isInsidePanel(int px, int py) {
+        return px >= PANEL_X && px < PANEL_X + PANEL_W && py >= PANEL_Y && py < PANEL_Y + PANEL_H;
     }
 
     /**

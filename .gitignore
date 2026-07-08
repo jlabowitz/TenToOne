@@ -3,5 +3,8 @@ build/
 out/
 *.class
 
+# InteractionLog output (dev-only diagnostic; see InteractionLog.java)
+interaction.log
+
 # Editor config with machine-specific paths (JDK location, etc.)
 .vscode/

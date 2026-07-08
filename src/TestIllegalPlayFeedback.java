@@ -1,14 +1,9 @@
 import org.junit.Test;
 
 import java.awt.Color;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics;
-import java.awt.image.BufferedImage;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -64,119 +59,6 @@ public class TestIllegalPlayFeedback {
         feedback.trigger("Trump hasn't been broken yet -- lead a different suit.");
     }
 
-    // ROADMAP follow-up: Rules hotspot, mirrors NextTrickPrompt.isRulesHotspot
-    // (same geometry, same half-open-rect convention). See TestNextTrickPrompt
-    // for the original version of this contract.
-    private static final int RULES_TOP = 265;
-    private static final int RULES_BOTTOM = 295;
-    private static final int RULES_LEFT = 760;
-    private static final int RULES_RIGHT = 820;
-
-    @Test
-    public void clickInsideRulesHotspotReturnsTrue() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertTrue(feedback.isRulesHotspot(790, 280));
-    }
-
-    @Test
-    public void rulesHotspotLeftAndTopBoundaryIsInclusive() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertTrue(feedback.isRulesHotspot(RULES_LEFT, RULES_TOP));
-    }
-
-    @Test
-    public void rulesHotspotRightAndBottomBoundaryIsExclusive() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertFalse(feedback.isRulesHotspot(RULES_RIGHT, 280));
-        assertFalse(feedback.isRulesHotspot(790, RULES_BOTTOM));
-        assertTrue(feedback.isRulesHotspot(RULES_RIGHT - 1, RULES_BOTTOM - 1));
-    }
-
-    @Test
-    public void clickOutsideRulesHotspotReturnsFalse() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertFalse(feedback.isRulesHotspot(RULES_LEFT - 1, 280));
-        assertFalse(feedback.isRulesHotspot(790, RULES_TOP - 1));
-    }
-
-    // ROADMAP follow-up: in-game Achievements hotspot, same y band as Rules,
-    // sitting to its left with a visible gap -- see IllegalPlayFeedback's
-    // ACHIEVEMENTS_* fields comment for how this geometry was derived.
-    private static final int ACHIEVEMENTS_TOP = 265;
-    private static final int ACHIEVEMENTS_BOTTOM = 295;
-    private static final int ACHIEVEMENTS_LEFT = 600;
-    private static final int ACHIEVEMENTS_RIGHT = 730;
-
-    @Test
-    public void clickInsideAchievementsHotspotReturnsTrue() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertTrue(feedback.isAchievementsHotspot(665, 280));
-    }
-
-    @Test
-    public void achievementsHotspotLeftAndTopBoundaryIsInclusive() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertTrue(feedback.isAchievementsHotspot(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP));
-    }
-
-    @Test
-    public void achievementsHotspotRightAndBottomBoundaryIsExclusive() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertFalse(feedback.isAchievementsHotspot(ACHIEVEMENTS_RIGHT, 280));
-        assertFalse(feedback.isAchievementsHotspot(665, ACHIEVEMENTS_BOTTOM));
-        assertTrue(feedback.isAchievementsHotspot(ACHIEVEMENTS_RIGHT - 1, ACHIEVEMENTS_BOTTOM - 1));
-    }
-
-    @Test
-    public void clickOutsideAchievementsHotspotReturnsFalse() {
-        IllegalPlayFeedback feedback = new IllegalPlayFeedback();
-        assertFalse(feedback.isAchievementsHotspot(ACHIEVEMENTS_LEFT - 1, 280));
-        assertFalse(feedback.isAchievementsHotspot(665, ACHIEVEMENTS_TOP - 1));
-    }
-
-    /**
-     * Explicit non-collision proof: the new Achievements box must not
-     * intersect the existing Rules box. This codebase has a documented
-     * history of exactly this kind of overlay-button pixel collision bug
-     * (see ROADMAP.md).
-     */
-    @Test
-    public void achievementsHotspotDoesNotOverlapRulesHotspot() {
-        assertFalse(rectsOverlap(ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM,
-                RULES_LEFT, RULES_TOP, RULES_RIGHT, RULES_BOTTOM));
-    }
-
-    /**
-     * The centered fade message (rendered at the same baseline y=280 this
-     * hotspot's y-band occupies) must not run under the Achievements box for
-     * either of the two possible illegal-play reasons -- this is measured
-     * (via Human.illegalReason's actual longest-case strings and headless
-     * FontMetrics), not eyeballed.
-     */
-    @Test
-    public void achievementsHotspotDoesNotOverlapEitherIllegalReasonMessage() {
-        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        Graphics g = image.getGraphics();
-        g.setFont(g.getFont().deriveFont(Font.BOLD));
-        FontMetrics metrics = g.getFontMetrics();
-
-        String trumpNotBroken = "Trump hasn't been broken yet -- lead a different suit.";
-        String followSuitDiamonds = "You must follow suit -- play a Diamonds card."; // longest suit name
-        for (String message : new String[]{trumpNotBroken, followSuitDiamonds}) {
-            int width = metrics.stringWidth(message);
-            int textEnd = (840 - width) / 2 + width; // Game.WIDTH = 840
-            assertTrue("\"" + message + "\" (ends at x=" + textEnd + ") must clear the Achievements box (starts at x=" + ACHIEVEMENTS_LEFT + ")",
-                    textEnd <= ACHIEVEMENTS_LEFT);
-        }
-        g.dispose();
-    }
-
-    /** Half-open rect intersection test: true iff [aLeft,aRight)x[aTop,aBottom) and [bLeft,bRight)x[bTop,bBottom) share any pixel. */
-    private static boolean rectsOverlap(int aLeft, int aTop, int aRight, int aBottom,
-                                         int bLeft, int bTop, int bRight, int bBottom) {
-        return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
-    }
-
     // ROADMAP item 10: hamburger-menu icon hotspot, top-left corner --
     // duplicated (not shared) across BetStepper/IllegalPlayFeedback/
     // NextTrickPrompt. Moved to the very top of the canvas (was y=[60,90))
@@ -215,17 +97,4 @@ public class TestIllegalPlayFeedback {
         assertFalse(feedback.isHamburgerHotspot(20, HAMBURGER_TOP - 1));
     }
 
-    /**
-     * Explicit non-collision proof: the hamburger hotspot must not intersect
-     * the Rules box, the Achievements box, or the centered fade message's
-     * band -- this codebase has a documented history of exactly this kind of
-     * overlay-button pixel collision bug (see ROADMAP.md).
-     */
-    @Test
-    public void hamburgerHotspotDoesNotOverlapRulesOrAchievements() {
-        assertFalse(rectsOverlap(HAMBURGER_LEFT, HAMBURGER_TOP, HAMBURGER_RIGHT, HAMBURGER_BOTTOM,
-                RULES_LEFT, RULES_TOP, RULES_RIGHT, RULES_BOTTOM));
-        assertFalse(rectsOverlap(HAMBURGER_LEFT, HAMBURGER_TOP, HAMBURGER_RIGHT, HAMBURGER_BOTTOM,
-                ACHIEVEMENTS_LEFT, ACHIEVEMENTS_TOP, ACHIEVEMENTS_RIGHT, ACHIEVEMENTS_BOTTOM));
-    }
 }

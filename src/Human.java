@@ -112,36 +112,32 @@ public class Human extends Player{
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "AchievementToast (dismiss)");
                     achievementToast.dismiss();
                     continue;
                 }
-                if (stepper.isRulesHotspot(click.x, click.y)) {
-                    RulesView.showBlocking(handler, mouseInput, achievementToast);
-                    mouseInput.clearClicks();
-                    continue;
-                }
-                if (stepper.isAchievementsHotspot(click.x, click.y)) {
-                    AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
-                    mouseInput.clearClicks();
-                    continue;
-                }
                 if (stepper.isHamburgerHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "hamburger icon (open menu)");
                     handleHamburgerMenu();
                     mouseInput.clearClicks();
                     continue;
                 }
                 BetStepper.Control control = stepper.controlAt(click.x, click.y);
                 if (control == null) {
+                    InteractionLog.logClick(click.x, click.y, "no control matched");
                     continue;
                 }
                 switch (control) {
                     case DECREMENT:
+                        InteractionLog.logClick(click.x, click.y, "BetStepper.DECREMENT");
                         stepper.decrement();
                         continue;
                     case INCREMENT:
+                        InteractionLog.logClick(click.x, click.y, "BetStepper.INCREMENT");
                         stepper.increment();
                         continue;
                     case BET:
+                        InteractionLog.logClick(click.x, click.y, "BetStepper.BET");
                         int candidate = stepper.getValue();
                         if (Round.isLegalBet(candidate, maxBet, sumOfPriorBets, maxBet,
                                 isLastBettor, totalBetsCannotEqualTricks)) {
@@ -193,33 +189,28 @@ public class Human extends Player{
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "AchievementToast (dismiss)");
                     achievementToast.dismiss();
                     continue;
                 }
-                if (feedback.isRulesHotspot(click.x, click.y)) {
-                    RulesView.showBlocking(handler, mouseInput, achievementToast);
-                    mouseInput.clearClicks();
-                    continue;
-                }
-                if (feedback.isAchievementsHotspot(click.x, click.y)) {
-                    AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
-                    mouseInput.clearClicks();
-                    continue;
-                }
                 if (feedback.isHamburgerHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "hamburger icon (open menu)");
                     handleHamburgerMenu();
                     mouseInput.clearClicks();
                     continue;
                 }
                 Card card = getHand().cardAt(click.x, click.y);
                 if (card == null) {
+                    InteractionLog.logClick(click.x, click.y, "no control matched");
                     continue;
                 }
                 if (!legal.contains(card)) {
+                    InteractionLog.logClick(click.x, click.y, "hand card " + card + " (illegal)");
                     feedback.trigger(illegalReason(cardsPlayed, leading));
                     System.out.println("The " + card + " is not a legal play.");
                     continue;
                 }
+                InteractionLog.logClick(click.x, click.y, "hand card " + card);
                 getHand().playCard(card);
                 System.out.println(getName() + " played the " + card);
                 played = card;
@@ -264,24 +255,17 @@ public class Human extends Player{
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "AchievementToast (dismiss)");
                     achievementToast.dismiss();
                     continue;
                 }
-                if (prompt.isRulesHotspot(click.x, click.y)) {
-                    RulesView.showBlocking(handler, mouseInput, achievementToast);
-                    mouseInput.clearClicks();
-                    continue;
-                }
-                if (prompt.isAchievementsHotspot(click.x, click.y)) {
-                    AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
-                    mouseInput.clearClicks();
-                    continue;
-                }
                 if (prompt.isHamburgerHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "hamburger icon (open menu)");
                     handleHamburgerMenu();
                     mouseInput.clearClicks();
                     continue;
                 }
+                InteractionLog.logClick(click.x, click.y, "NextTrickPrompt (continue)");
                 break;
             }
         } finally {

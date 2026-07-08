@@ -2,9 +2,15 @@ import java.awt.*;
 
 /**
  * ROADMAP item 10 (hamburger menu, "Pause" item): shows "Paused" plus a
- * "Resume" button (a relabel of RulesView/AchievementsView's own Back-button
- * geometry/position, for visual consistency with this codebase's other
- * full-page views -- same PANEL_X/Y/W/H too).
+ * "Resume" button. As of this follow-up polish pass, a small dialog centered
+ * on the 840x630 canvas (300x160) rather than the earlier full-canvas panel
+ * -- still draws the same full-canvas light-gray scrim behind it (unchanged),
+ * only the white panel itself shrunk.
+ *
+ * Also click-outside-dismisses now, mirroring HamburgerMenu's own
+ * miss-click convention: a click anywhere outside the panel resumes with no
+ * other action, same as clicking Resume itself -- the earlier Resume-only
+ * dismiss meant a miss-click just looped forever.
  *
  * Judgment call, documented here rather than silently assumed: this view
  * *is* the whole freeze. "Pause" is only ever reachable from inside one of
@@ -21,32 +27,47 @@ import java.awt.*;
  * delay), this reasoning would need revisiting.
  */
 public class PauseView extends GameObject {
-    private static final int PANEL_X = 40, PANEL_Y = 20, PANEL_W = 760, PANEL_H = 590;
+    private static final int PANEL_W = 300, PANEL_H = 160;
+    private static final int PANEL_X = (Game.WIDTH - PANEL_W) / 2;
+    private static final int PANEL_Y = (Game.HEIGHT - PANEL_H) / 2;
     private static final int CONTENT_LEFT = PANEL_X + 30, CONTENT_RIGHT = PANEL_X + PANEL_W - 30;
 
-    private static final int TITLE_Y = 300;
+    private static final int TITLE_Y = PANEL_Y + 55;
 
-    private static final int RESUME_TOP = 576, RESUME_BOTTOM = 602;
-    private static final int RESUME_LEFT = 680, RESUME_RIGHT = 760;
+    private static final int RESUME_LEFT = PANEL_X + 60, RESUME_RIGHT = PANEL_X + 180;
+    private static final int RESUME_BOTTOM = PANEL_Y + PANEL_H - 20, RESUME_TOP = RESUME_BOTTOM - 36;
 
     /**
      * Same lifecycle shape as RulesView.showBlocking, including the same
      * ACHIEVEMENTTOAST click-to-dismiss check ahead of the Resume check.
+     * A click outside the panel resumes with no other action, matching
+     * HamburgerMenu's own miss-click convention -- unlike RulesView/
+     * AchievementsView's full-canvas panels (where every click is "inside"
+     * something), this panel is small enough that a miss-click is common
+     * and must not hang the loop forever.
      */
     public static void showBlocking(Handler handler, MouseInput mouseInput, AchievementToast achievementToast) {
         PauseView view = new PauseView();
         handler.addObject(view);
+        InteractionLog.logShown("PauseView");
         try {
             mouseInput.clearClicks();
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "AchievementToast (dismiss)");
                     achievementToast.dismiss();
                     continue;
                 }
                 if (view.isResumeButton(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "PauseView.Resume");
                     return;
                 }
+                if (!view.isInsidePanel(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "outside-panel dismiss (PauseView)");
+                    return;
+                }
+                InteractionLog.logClick(click.x, click.y, "no control matched (PauseView)");
             }
         } finally {
             handler.removeObject(view);
@@ -56,6 +77,11 @@ public class PauseView extends GameObject {
     /** Half-open rect hit-test, same convention/geometry as RulesView.isBackButton (relabeled Resume here). */
     public boolean isResumeButton(int px, int py) {
         return px >= RESUME_LEFT && px < RESUME_RIGHT && py >= RESUME_TOP && py < RESUME_BOTTOM;
+    }
+
+    /** Half-open rect hit-test for the panel itself, used to distinguish an inert click on the panel from a true miss-click. */
+    public boolean isInsidePanel(int px, int py) {
+        return px >= PANEL_X && px < PANEL_X + PANEL_W && py >= PANEL_Y && py < PANEL_Y + PANEL_H;
     }
 
     @Override

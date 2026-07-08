@@ -720,9 +720,9 @@ public class TestGame {
             // where this thread's next click gets queued and then wiped by
             // that clearClicks() before the nested loop starts awaiting it.
             sleep50();
-            deliverClick(mouseInput, 130, 35); // Restart (row 1, col 1: index 4, x=[120,220), y=[29,47))
+            deliverClick(mouseInput, 30, 145); // Restart Game (single column, row 4: y=[131,161))
             sleep50();
-            deliverClick(mouseInput, 150, 25); // Yes
+            deliverClick(mouseInput, 350, 340); // Yes
         });
         clicker.start();
 
@@ -843,6 +843,88 @@ public class TestGame {
     }
 
     /**
+     * User-reported bug (live playthrough, 2026-07-07): after confirming
+     * Restart Game mid-betting-phase, the very next screen (fresh hand + bet
+     * stepper) still showed every AI seat's played card from the previous,
+     * interrupted trick -- one of them carrying the gold "highest card so
+     * far" ring -- rendered on top. Root cause: Trick.play() registers each
+     * played Card directly with the Handler (its own handler.addObject(card)
+     * calls) and only ever removes them via Round.playRound()'s
+     * handler.removeAll(cardsPlayed), reached once currentTrick.play()
+     * returns *normally* -- but Restart confirmed from inside Human.playCard()'s
+     * blocking click-loop (this test's clicker thread) throws RestartGameSignal
+     * straight out of that loop, unwinding past playRound()'s post-trick
+     * cleanup entirely. cleanupHandlerForMenuOrRestart() (run by
+     * abandonAndRestart(), below) only ever removed Players/the trump card/
+     * the human's Hand -- never these stray Trick-played Card objects -- so
+     * a seat that had already played this trick before Restart was confirmed
+     * stayed registered with the Handler forever, rendering on top of every
+     * later screen. Reproduces the exact shape: Bot (seat 1) leads and plays
+     * its one card; the human's own playCard() blocking loop is then
+     * interrupted via Restart before the human plays.
+     */
+    @Test(timeout = 5000)
+    public void abandonAndRestartMidTrickRemovesStaleTrickPlayedCards() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Player human = game.getPlayers().get(0);
+        Player bot = game.getPlayers().get(1);
+
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.HEARTS, CardValue.ACE));
+        human.setHand(humanHand);
+
+        Hand botHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        botHand.addCard(new Card(Suit.DIAMONDS, CardValue.TWO));
+        bot.setHand(botHand);
+
+        List<Player> players = game.getPlayers();
+        // Bot (seat 1) leads; currentTrick left null so Round.playRound()
+        // builds a fresh Trick and Bot's own real (non-reconstructed)
+        // playCard() call registers its Card with the Handler via
+        // Trick.play()'s own handler.addObject(card) -- the exact live code
+        // path, not the reconstruction-constructor shortcut the earlier
+        // mid-trick resume tests above use.
+        Round round = new Round(1, players, 1, Game.WIDTH, Game.HEIGHT, game.getHandler(),
+                new Card(Suit.HEARTS, CardValue.KING), Suit.HEARTS, false);
+        game.setCurrentRoundForTest(round);
+
+        MouseInput mouseInput = game.getMouseInput();
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 20, 20); // hamburger icon (IllegalPlayFeedback's hotspot, Human.playCard())
+            sleep50();
+            deliverClick(mouseInput, 30, 145); // Restart Game (single column, row 4: y=[131,161))
+            sleep50();
+            deliverClick(mouseInput, 350, 340); // Yes
+        });
+        clicker.start();
+
+        try {
+            round.playRound();
+            fail("expected RestartGameSignal to propagate out of playRound() -- Bot must have already "
+                    + "played this trick before Human's blocking playCard() loop is interrupted");
+        } catch (RestartGameSignal expected) {
+            // expected
+        }
+        clicker.join();
+
+        boolean botsCardStillRegistered = game.getHandler().object.stream()
+                .anyMatch(o -> o instanceof Card c && c.getSuit() == Suit.DIAMONDS && c.getValue() == CardValue.TWO);
+        assertTrue("test setup: Bot's already-played card must actually be stuck in the Handler at the "
+                        + "moment Restart is confirmed, proving this reproduces the live bug's root cause",
+                botsCardStillRegistered);
+
+        game.abandonAndRestart();
+
+        long cardsStillRegistered = game.getHandler().object.stream().filter(o -> o instanceof Card).count();
+        assertEquals("abandonAndRestart() must remove every Trick-played Card object left over from an "
+                        + "interrupted trick (Bot's stray card here) -- otherwise it renders forever on top "
+                        + "of every later screen, including the next round's fresh deal/bet stepper (the "
+                        + "user-reported 'ghost played cards + gold highlight ring' bug)",
+                0, cardsStillRegistered);
+    }
+
+    /**
      * Code-review Finding 2: the same Handler re-registration bug class
      * abandonAndRestartReRegistersPlayersWithTheHandler proves fixed for the
      * Restart path had no dedicated regression test for the Menu -> fresh
@@ -915,7 +997,7 @@ public class TestGame {
             // HamburgerMenu.showBlocking()'s own nested clearClicks() races
             // against this thread without a short pause here.
             sleep50();
-            deliverClick(mouseInput, 30, 35); // Menu (row 1, col 0: index 3, x=[20,120), y=[29,47))
+            deliverClick(mouseInput, 30, 175); // Go to Menu (single column, row 5: y=[161,191))
         });
         clicker.start();
 
@@ -928,6 +1010,64 @@ public class TestGame {
         clicker.join();
 
         assertTrue("Menu must checkpoint before throwing, so a resumable save exists", game.hasResumableGame());
+    }
+
+    /**
+     * Same root cause as abandonAndRestartMidTrickRemovesStaleTrickPlayedCards
+     * above, but for the "Go to Menu" path -- cleanupHandlerForMenuOrRestart()
+     * is the single method shared by both Menu and Restart (see play()'s own
+     * ReturnToMenuSignal/RestartGameSignal catch blocks), so this proves the
+     * exact same latent leak the user only actually triggered via Restart was
+     * equally present on Menu, and is fixed for both by the same change.
+     */
+    @Test(timeout = 5000)
+    public void menuMidTrickCleanupRemovesStaleTrickPlayedCards() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Player human = game.getPlayers().get(0);
+        Player bot = game.getPlayers().get(1);
+
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.HEARTS, CardValue.ACE));
+        human.setHand(humanHand);
+
+        Hand botHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        botHand.addCard(new Card(Suit.DIAMONDS, CardValue.TWO));
+        bot.setHand(botHand);
+
+        List<Player> players = game.getPlayers();
+        Round round = new Round(1, players, 1, Game.WIDTH, Game.HEIGHT, game.getHandler(),
+                new Card(Suit.HEARTS, CardValue.KING), Suit.HEARTS, false);
+        game.setCurrentRoundForTest(round);
+
+        MouseInput mouseInput = game.getMouseInput();
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 20, 20); // hamburger icon
+            sleep50();
+            deliverClick(mouseInput, 30, 175); // Go to Menu (single column, row 5: y=[161,191))
+        });
+        clicker.start();
+
+        try {
+            round.playRound();
+            fail("expected ReturnToMenuSignal to propagate out of playRound() -- Bot must have already "
+                    + "played this trick before Human's blocking playCard() loop is interrupted");
+        } catch (ReturnToMenuSignal expected) {
+            // expected
+        }
+        clicker.join();
+
+        boolean botsCardStillRegistered = game.getHandler().object.stream()
+                .anyMatch(o -> o instanceof Card c && c.getSuit() == Suit.DIAMONDS && c.getValue() == CardValue.TWO);
+        assertTrue("test setup: Bot's already-played card must actually be stuck in the Handler",
+                botsCardStillRegistered);
+
+        game.cleanupHandlerForMenuOrRestart();
+
+        long cardsStillRegistered = game.getHandler().object.stream().filter(o -> o instanceof Card).count();
+        assertEquals("cleanupHandlerForMenuOrRestart() must remove every Trick-played Card object left "
+                        + "over from an interrupted trick -- shared by both the Menu and Restart paths",
+                0, cardsStillRegistered);
     }
 
     /**
@@ -988,6 +1128,79 @@ public class TestGame {
             assertEquals("player " + player.getName() + " must be registered exactly once, not doubled",
                     1, registrationCount);
         }
+    }
+
+    /**
+     * User-reported bug (live playthrough, 2026-07-07): "I could see too many
+     * cards" after Menu -> Resume, reproducible on the very next Menu click.
+     * Root cause: a checkpoint taken mid-betting-phase (before every player
+     * has bet) resumes with playOneRound()'s "!allPlayersHaveBet()" branch
+     * re-invoking Round.bet() on the already-reconstructed Round -- but the
+     * reconstruction constructor already registered the human's Hand (and
+     * the trump card) with the Handler once (so betting has something to
+     * render), and bet() unconditionally re-registers both again at its own
+     * top. The same Hand instance ends up added to the Handler twice.
+     * Harmless-looking on its own (same object, same layout, same pixels),
+     * but Handler.removeObject only removes a single occurrence per call --
+     * so the *next* cleanupHandlerForMenuOrRestart() (the next Menu click)
+     * only strips one of the two registrations, permanently leaking a stale
+     * duplicate Hand that keeps rendering its own (increasingly stale) card
+     * set on top of whatever hand replaces it afterward. That stacked,
+     * never-cleaned-up stale hand is what actually reads as "too many
+     * cards" on screen.
+     */
+    @Test
+    public void resumingMidBettingPhaseDoesNotDoubleRegisterHumanHandOrTrumpCard() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        Player human = game.getPlayers().get(0);
+        Player bot = game.getPlayers().get(1);
+
+        Hand humanHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
+        humanHand.addCard(new Card(Suit.HEARTS, CardValue.KING));
+        human.setHand(humanHand);
+
+        Hand botHand = new Hand(Game.WIDTH, Game.HEIGHT, ID.AI);
+        botHand.addCard(new Card(Suit.CLUBS, CardValue.TWO));
+        bot.setHand(botHand);
+
+        List<Player> players = game.getPlayers();
+        // Betting genuinely incomplete (neither player has bet yet) -- mirrors
+        // a checkpoint taken right as Human.bet()'s blocking click-loop starts.
+        // Human (seat 0) is the round's first bettor.
+        Round round = new Round(1, players, 0, Game.WIDTH, Game.HEIGHT, game.getHandler(),
+                new Card(Suit.HEARTS, CardValue.ACE), Suit.HEARTS, false);
+        game.setCurrentRoundForTest(round);
+
+        game.saveGameStateCheckpoint();
+        game.cleanupHandlerForMenuOrRestart();
+        game.resumeFromSavedGame();
+
+        Round resumedRound = game.getCurrentRound();
+        Player resumedHuman = game.getPlayers().get(0);
+        MouseInput mouseInput = game.getMouseInput();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            // Bet button, default stepper value 0 -- Human is the first
+            // bettor (not last), so no forbidden-bet restriction applies.
+            deliverClick(mouseInput, 750, 600);
+        });
+        clicker.start();
+        // Mirrors playOneRound()'s own mid-betting-resume call exactly.
+        resumedRound.bet(resumedRound.getCurrentPlayer(), game.getGameSettings());
+        clicker.join();
+
+        long handRegistrations = game.getHandler().object.stream()
+                .filter(o -> o == resumedHuman.getHand())
+                .count();
+        assertEquals("resumed human's hand must be registered exactly once with the Handler, not doubled",
+                1, handRegistrations);
+
+        long trumpCardRegistrations = game.getHandler().object.stream()
+                .filter(o -> o == resumedRound.getTrumpCard())
+                .count();
+        assertEquals("resumed round's trump card must be registered exactly once with the Handler, not doubled",
+                1, trumpCardRegistrations);
     }
 
     /**
@@ -1306,9 +1519,19 @@ public class TestGame {
      * internal gameSettings field were ever a disconnected copy instead of
      * the same reference Game holds, this test would fail even though
      * TestSettingsView's own direct test would still pass.
+     *
+     * ROADMAP item 10 follow-up: rewritten for the gated-apply behavior --
+     * toggling Settings mid-round now only flips the *pending* value; the
+     * live totalBetsCannotEqualTricks field Round.bet() actually reads must
+     * NOT change until a genuinely fresh game starts (restartForNewGame()/
+     * establishFreshGameState()). This test proves both halves: the
+     * mid-round no-op on the live field, and that the exact same
+     * GameSettings instance does pick up the change once a fresh game
+     * actually starts.
      */
     @Test(timeout = 5000)
-    public void settingsToggleFromHamburgerMenuMutatesTheSameGameSettingsInstanceGameUses() throws InterruptedException {
+    public void settingsToggleFromHamburgerMenuStagesOnTheSameGameSettingsInstanceGameUsesButDoesNotApplyMidRound()
+            throws InterruptedException {
         Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
         Human human = (Human) game.getPlayers().get(0);
         Hand hand = new Hand(Game.WIDTH, Game.HEIGHT, ID.HUMAN);
@@ -1317,12 +1540,13 @@ public class TestGame {
         MouseInput mouseInput = game.getMouseInput();
 
         assertTrue("default is ON per GameSettings' own doc", game.getGameSettings().totalBetsCannotEqualTricks);
+        assertTrue("pending default is also ON", game.getGameSettings().pendingTotalBetsCannotEqualTricks);
 
         Thread clicker = new Thread(() -> {
             sleep50();
             deliverClick(mouseInput, 20, 20); // hamburger icon
             sleep50();
-            deliverClick(mouseInput, 230, 20); // Settings (row 0, col 2: index 2, x=[220,320), y=[11,29))
+            deliverClick(mouseInput, 30, 85); // Settings (single column, row 2: y=[71,101))
             sleep50();
             deliverClick(mouseInput, 550, 135); // the toggle
             sleep50();
@@ -1336,7 +1560,14 @@ public class TestGame {
         clicker.join();
 
         assertFalse("toggling Settings via the hamburger menu must mutate the exact GameSettings "
-                        + "instance Game.playOneRound() passes into every Round.bet() call",
+                        + "instance's pending value",
+                game.getGameSettings().pendingTotalBetsCannotEqualTricks);
+        assertTrue("the live/effective value must NOT change mid-round just from visiting Settings",
+                game.getGameSettings().totalBetsCannotEqualTricks);
+
+        game.restartForNewGame();
+
+        assertFalse("once a fresh game actually starts, the staged toggle must now be applied",
                 game.getGameSettings().totalBetsCannotEqualTricks);
     }
 

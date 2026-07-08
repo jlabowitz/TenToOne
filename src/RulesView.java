@@ -83,17 +83,21 @@ public class RulesView extends GameObject {
     public static void showBlocking(Handler handler, MouseInput mouseInput, AchievementToast achievementToast) {
         RulesView view = new RulesView();
         handler.addObject(view);
+        InteractionLog.logShown("RulesView");
         try {
             mouseInput.clearClicks();
             while (true) {
                 Point click = mouseInput.awaitClick();
                 if (achievementToast.isToastHotspot(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "AchievementToast (dismiss)");
                     achievementToast.dismiss();
                     continue;
                 }
                 if (view.isBackButton(click.x, click.y)) {
+                    InteractionLog.logClick(click.x, click.y, "RulesView.Back");
                     return;
                 }
+                InteractionLog.logClick(click.x, click.y, "no control matched (RulesView)");
             }
         } finally {
             handler.removeObject(view);

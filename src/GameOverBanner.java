@@ -169,7 +169,7 @@ public class GameOverBanner extends ModalOverlay {
 
     /**
      * Half-open rect hit-test, same convention as
-     * NextTrickPrompt.isRulesHotspot/RulesView.isBackButton. Called by
+     * NextTrickPrompt.isHamburgerHotspot/RulesView.isBackButton. Called by
      * Game.awaitPlayAgain (backend pass) after showGameOverBanner returns
      * this instance.
      */

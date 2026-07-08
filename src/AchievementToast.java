@@ -122,7 +122,7 @@ public class AchievementToast extends GameObject {
 
     /**
      * Half-open-rect hit-test for the click-to-dismiss target, same
-     * convention as BetStepper.controlAt/*.isRulesHotspot -- but a big,
+     * convention as BetStepper.controlAt/isHamburgerHotspot -- but a big,
      * generous top-of-canvas band (see TOAST_BAND_BOTTOM) rather than a tight
      * bound on the rendered text, since that text is centered and
      * variable-width. Gated on isShowingSomething() so a click up here is
@@ -153,6 +153,9 @@ public class AchievementToast extends GameObject {
         if (currentText == null || elapsed >= TOTAL_TICKS) {
             currentText = queue.poll(); // null if the queue is empty -- fine, isShowingSomething() handles it
             elapsed = 0;
+            if (currentText != null) {
+                InteractionLog.logShown("AchievementToast: " + currentText);
+            }
         } else {
             elapsed++;
         }

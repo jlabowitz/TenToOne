@@ -72,6 +72,25 @@ public class Handler {
     }
 
     /**
+     * Removes every currently-registered object that is an instance of TYPE
+     * -- used by Game.cleanupHandlerForMenuOrRestart() to strip every stray
+     * Trick-played Card object left over from a trick interrupted mid-play
+     * (see that method's own doc), without the caller needing to track each
+     * one individually or reach into this class's internal list directly.
+     * Iterates `object` itself (not a defensive copy): safe to mutate
+     * mid-iteration since CopyOnWriteArrayList's iterator is a fixed
+     * snapshot of the list at iteration-start time (see this class's own
+     * doc on why COWAL was chosen).
+     */
+    public void removeAllOfType(Class<?> type) {
+        for (GameObject candidate : object) {
+            if (type.isInstance(candidate)) {
+                removeObject(candidate);
+            }
+        }
+    }
+
+    /**
      * Registers OBJECT to always render (and tick) last, re-bumped to the
      * end of the list every time anything else is added to this Handler --
      * see this class's doc for why. Adds OBJECT itself if it isn't already
