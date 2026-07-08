@@ -215,7 +215,7 @@ public class Game extends Canvas implements Runnable{
             }
         } else {
             //Code-review fix (ROADMAP item 14): the player was offered
-            //Resume and declined it in favor of a fresh Start Game -- clear
+            //Resume and declined it in favor of a fresh New Game -- clear
             //the now-abandoned saved game, same rationale as
             //establishFreshGameState()'s own gameStateStore.clear() call
             //(leaving it on disk would let a later Resume try to reconstruct
@@ -353,7 +353,7 @@ public class Game extends Canvas implements Runnable{
     /**
      * Code-review fix (ROADMAP item 14): the boot-time analog of
      * captureHumanName() above -- same runStartScreen() click-loop seam, but
-     * surfaces the full StartScreenOutcome (Start Game vs. Resume Game)
+     * surfaces the full StartScreenOutcome (New Game vs. Resume Game)
      * instead of collapsing it down to a human-name string, since the plain
      * constructor (unlike every other runStartScreen() caller except
      * handleMenuReturn()) needs to branch on which control the user actually
@@ -412,15 +412,42 @@ public class Game extends Canvas implements Runnable{
      * have a resumable game at the moment they call this: the constructor
      * runs before any game state exists, and restartForNewGame() clears the
      * saved game before calling captureHumanName) are unaffected either way.
+     *
+     * ROADMAP item 10 follow-up: this loop now polls (awaitClickOrTimeout)
+     * instead of blocking forever on awaitClick(), so it can also notice
+     * StartScreen's Enter-to-submit flag between clicks -- see
+     * consumeSubmitRequested()'s own doc for why that's a plain poll flag
+     * rather than a queue. Enter performs the same action as whichever
+     * button is currently showing/eligible (Resume if resumable, else
+     * Start) -- both branches reuse attemptStartSubmit() rather than
+     * duplicating the START case's own logic.
+     *
+     * Code-review fix: keyInput.setTarget(startScreen) stays pinned to this
+     * StartScreen instance for the whole method, including while a nested
+     * Rules/Achievements/Settings/Stats view is shown on top of it via its
+     * own showBlocking call below -- so a stray Enter pressed while one of
+     * those is open still sets this StartScreen's submitRequested flag (Key
+     * Input has no notion of "this target is temporarily backgrounded").
+     * Previously nothing drained that flag when the nested view closed, so
+     * the very next loop iteration would spuriously fire Resume/Start the
+     * instant the user closed Rules/Achievements/Settings/Stats -- each
+     * mouseInput.clearClicks() call below is now paired with a
+     * consumeSubmitRequested() call for the same reason, discarding
+     * whatever it returns.
+     *
+     * Package-private (not private), mirroring awaitPlayAgain's own
+     * testability-seam pattern, so TestGame can drive this directly with
+     * injected clicks/keystrokes (see getMouseInput()/getKeyInput()) without
+     * going through a HeadlessGame subclass's captureStartScreenOutcome
+     * override, which exists specifically to bypass this loop entirely.
      */
-    private StartScreenOutcome runStartScreen(List<String> aiNames, boolean offerResume) {
+    StartScreenOutcome runStartScreen(List<String> aiNames, boolean offerResume) {
         boolean resumable = offerResume && hasResumableGame();
         //ROADMAP item 2: the stat line's data is a snapshot of saveData as of
         //this StartScreen's construction -- fine, since saveData only
         //changes via this same class's round-end/game-end/name-submission
         //hooks, none of which run while a StartScreen is on screen.
-        StartScreen startScreen = new StartScreen(saveData.gamesPlayed, saveData.highScore,
-                saveData.bestWinStreakEver, resumable);
+        StartScreen startScreen = new StartScreen(saveData.gamesPlayed, resumable, saveData.lastUsedName);
         handler.addObject(startScreen);
         InteractionLog.logShown("StartScreen");
         keyInput.setTarget(startScreen);
@@ -428,10 +455,33 @@ public class Game extends Canvas implements Runnable{
         try {
             mouseInput.clearClicks();
             while (true) {
-                Point click = mouseInput.awaitClick();
+                if (startScreen.consumeSubmitRequested()) {
+                    InteractionLog.logEvent("KEY Enter -> StartScreen." + (resumable ? "RESUME" : "START"));
+                    if (resumable) {
+                        return StartScreenOutcome.resume();
+                    }
+                    StartScreenOutcome outcome = attemptStartSubmit(startScreen);
+                    if (outcome != null) {
+                        return outcome;
+                    }
+                    continue;
+                }
+                Point click = mouseInput.awaitClickOrTimeout(START_SCREEN_SUBMIT_POLL_MILLIS);
+                if (click == null) {
+                    continue;
+                }
                 StartScreen.Control control = startScreen.controlAt(click.x, click.y);
                 if (control == null) {
-                    InteractionLog.logClick(click.x, click.y, "no control matched (StartScreen)");
+                    //ROADMAP item 10 follow-up: a click inside the name field
+                    //places the cursor there (standard text-field
+                    //click-to-position convention) instead of being just
+                    //another unmatched miss-click.
+                    if (startScreen.isNameField(click.x, click.y)) {
+                        startScreen.clickNameField(click.x);
+                        InteractionLog.logClick(click.x, click.y, "StartScreen.NameField");
+                    } else {
+                        InteractionLog.logClick(click.x, click.y, "no control matched (StartScreen)");
+                    }
                     continue;
                 }
                 InteractionLog.logClick(click.x, click.y, "StartScreen." + control);
@@ -439,39 +489,68 @@ public class Game extends Canvas implements Runnable{
                     case RULES:
                         RulesView.showBlocking(handler, mouseInput, achievementToast);
                         mouseInput.clearClicks();
+                        startScreen.consumeSubmitRequested();
                         continue;
                     case ACHIEVEMENTS:
                         AchievementsView.showBlocking(handler, mouseInput, saveData, achievementToast);
                         mouseInput.clearClicks();
+                        startScreen.consumeSubmitRequested();
                         continue;
                     case SETTINGS:
                         SettingsView.showBlocking(handler, mouseInput, achievementToast, gameSettings);
                         mouseInput.clearClicks();
+                        startScreen.consumeSubmitRequested();
+                        continue;
+                    case STATS:
+                        StatsView.showBlocking(handler, mouseInput, achievementToast, saveData);
+                        mouseInput.clearClicks();
+                        startScreen.consumeSubmitRequested();
                         continue;
                     case RESUME:
                         return StartScreenOutcome.resume();
-                    case START:
-                        String typedName = startScreen.getName().trim();
-                        if (!typedName.isEmpty()) {
-                            //ROADMAP item 2: the Bapi easter egg, checked at
-                            //name-submission time -- same permanent-unlock
-                            //semantics as every other achievement, so
-                            //re-entering "Bapi" after it's already unlocked
-                            //is a no-op here (checkNameSubmission returns
-                            //false) and doesn't re-fire the toast.
-                            if (AchievementEngine.checkNameSubmission(saveData, typedName)) {
-                                saveStore.save(saveData);
-                                achievementToast.enqueue(Achievement.BAPI_EASTER_EGG);
-                            }
-                            return StartScreenOutcome.name(typedName);
+                    case START: {
+                        StartScreenOutcome outcome = attemptStartSubmit(startScreen);
+                        if (outcome != null) {
+                            return outcome;
                         }
                         continue;
+                    }
                 }
             }
         } finally {
             handler.removeObject(startScreen);
             keyInput.setTarget(null);
         }
+    }
+
+    /** ROADMAP item 10 follow-up: poll interval for runStartScreen()'s Enter-to-submit check -- short enough to feel instant, not so short it busy-loops. */
+    private static final long START_SCREEN_SUBMIT_POLL_MILLIS = 50;
+
+    /**
+     * Attempts to submit STARTSCREEN's currently-typed name -- shared by the
+     * START click case and Enter-to-submit (runStartScreen(), above) so
+     * neither duplicates the other's logic. Returns null (caller should
+     * continue looping) if the trimmed name is empty; otherwise persists
+     * lastUsedName (ROADMAP item 10 follow-up: every successful submission,
+     * not just a Bapi-easter-egg unlock, now writes to disk) and returns the
+     * outcome.
+     */
+    private StartScreenOutcome attemptStartSubmit(StartScreen startScreen) {
+        String typedName = startScreen.getName().trim();
+        if (typedName.isEmpty()) {
+            return null;
+        }
+        saveData.lastUsedName = typedName;
+        //ROADMAP item 2: the Bapi easter egg, checked at name-submission
+        //time -- same permanent-unlock semantics as every other achievement,
+        //so re-entering "Bapi" after it's already unlocked is a no-op here
+        //(checkNameSubmission returns false) and doesn't re-fire the toast.
+        boolean bapiNewlyUnlocked = AchievementEngine.checkNameSubmission(saveData, typedName);
+        saveStore.save(saveData);
+        if (bapiNewlyUnlocked) {
+            achievementToast.enqueue(Achievement.BAPI_EASTER_EGG);
+        }
+        return StartScreenOutcome.name(typedName);
     }
 
     private int numCardsThisRound() {
@@ -659,10 +738,10 @@ public class Game extends Canvas implements Runnable{
      * ROADMAP item 10 ("Menu"): re-runs the Start Screen (with the Resume
      * button available, since a checkpoint was just written by
      * onReturnToMenu() right before this was reached) and branches on
-     * whether the player picks Resume or types a name and clicks Start Game.
+     * whether the player picks Resume or types a name and clicks New Game.
      *
      * Known, accepted, explicitly-not-decided-here product gap: if the
-     * player picks a fresh Start Game instead of Resume, the suspended game
+     * player picks a fresh New Game instead of Resume, the suspended game
      * is abandoned with no extra confirmation (unlike Restart, which requires
      * an explicit second click) -- see this item's completion report.
      */

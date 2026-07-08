@@ -399,6 +399,129 @@ heavily than off-suit high cards in later rounds — logged under
 `ROADMAP.md`'s AI v2 item as tuning notes on this locked formula, not a
 reopening of it.
 
+### 15. Deterministic RNG seeding (deck shuffle) — done, not yet pushed
+`Deck` now accepts an injectable seed (`new Deck(long seed)`), defaulting to
+a freshly-generated one via the existing no-arg constructor so today's
+behavior is unchanged by default; `getSeed()` exposes whichever seed actually
+produced a given shuffle. Built as prerequisite infrastructure for the
+persistent-game-state reconstruction codec (item 16) — a seeded deck makes
+"deal a known hand" trivial to set up in a test instead of fighting real
+shuffle randomness. Commit `27ad74d`.
+
+The two other `new Random()` call sites in `Game.java` (initial
+`roundStartingPlayer`, `restartForNewGame()`'s re-roll) were deliberately
+left unseeded — out of scope for what the user actually asked about (the
+deck specifically).
+
+### 16. Persist in-progress game state across app restarts (resume after close) — done, not yet pushed
+New `GameStateSnapshot`/`GameStateCodec`/`GameStateStore` — a snapshot of a
+game in progress (round, scores, bets, hands, deck state via item 15's
+seeded shuffle) written to `<user.home>/.tentoone/gamestate-current.json`,
+reconstructible on next launch via a "Resume Game" button on the Start
+Screen. Three independent code paths perform this reconstruction (a
+direct-snapshot constructor, an in-session `resumeFromSavedGame()` for the
+hamburger menu's "Go to Menu"/Resume round-trip, and a boot-time
+`reconstructFromSnapshot()` + `play()`'s `establishInitialRenderState()`) —
+each does its own full render/reposition pass, which turned out to be the
+root of two real bugs (see item 17). Commits `27ad74d`, `307416b`.
+
+### 17. In-game hamburger menu + Start Screen overhaul — done, not yet pushed
+`ROADMAP.md` item 10's hamburger-menu half (the always-visible in-play
+status HUD half remains open — see that item's now-trimmed entry) plus a
+large multi-round polish pass on it and the Start Screen, driven by hands-on
+live testing rather than a single design spec.
+
+**Hamburger menu** (`HamburgerMenu.java`): a single vertical column — Pause,
+Rules, Settings, Achievements, Restart Game, Go to Menu — replacing an
+earlier 3x2 grid tried first and rejected on live testing as cramped.
+Restart requires an explicit second confirm click (a separately-sized,
+centered, smaller sub-view) before actually restarting. "Go to Menu"
+suspends the in-progress game (item 16) rather than discarding it, distinct
+from Restart. Legacy standalone Rules/Achievements buttons previously
+duplicated across `BetStepper`/`IllegalPlayFeedback`/`NextTrickPrompt` were
+removed once the menu covered the same ground.
+
+**Modal dismiss convention**: every full-screen modal (`RulesView`,
+`SettingsView`, `AchievementsView`, `StatsView`, `PauseView`) now dismisses
+on an outside click, not just its own Back/Resume button — pulled into a
+shared `ModalDismiss.isOutsidePanel()` helper (a static helper, not a base
+class, since these views' panel geometries differ too much to unify) so
+this is a one-line opt-in for any future modal instead of a pattern someone
+has to remember to hand-copy. `PauseView`/`RulesView`/`SettingsView`/
+`StatsView` were all also shrunk to fit their actual content instead of
+sharing one oversized 760x590 panel — `SettingsView` in particular went
+from 590px tall to 314px for what's still just one checkbox, with room
+deliberately left for upcoming visual-effects settings.
+
+**Start Screen** reworked into three equal-width, evenly-gapped button rows
+(Resume Game/New Game — "Start Game" renamed to "New Game" — Rules/
+Achievements, Stats/Settings), each pair spanning the same width the name
+field itself spans; a new **Stats** button/modal replaced the old inline
+stat line, adding four new tracked lifetime stats (`SaveData.totalPoints`,
+`totalRoundsBet`/`totalRoundsBetHit` for a "hit your bet" rate, derived
+win% and average-score-per-game) alongside the pre-existing games-played/
+won/best-streak fields, logically grouped (games, then scoring, then
+streaks/betting) rather than field-declaration order.
+
+**Name field** rework, closing out `ROADMAP.md` item 6's Enter-to-submit
+half (Tab-focus remains open — see that item) and incidentally satisfying
+old item 12 (prefill name on Play Again) as a side effect: the last
+submitted name now persists to `SaveData.lastUsedName` and prepopulates the
+field on every subsequent launch or restart, since `captureHumanName()`
+(used by both boot and `restartForNewGame()`/Play Again) always threads it
+through. The field grew a real cursor/selection model in place of the
+original append-only buffer, after live testing found the first pass's
+select-all had no visible indicator and arrow keys/click didn't work at
+all: Ctrl+A now shows a filled highlight (not a silent flag), Left/Right
+arrows move a real cursor (collapsing an active selection to the clicked
+edge, standard convention), Ctrl+Left/Right jump by word, a field click
+places the cursor at the nearest character boundary via cached
+`FontMetrics`, and the blinking caret now goes solid on any edit/navigation
+instead of continuing to blink mid-keystroke — all matching standard OS
+text-field behavior. A separate real bug (not a design gap) surfaced live:
+AWT's `isControlDown()` reflects whatever the *next* keystroke reports, and
+a real Ctrl release routinely lags the following keystroke by a few ms, so
+the letter typed immediately after Ctrl+A/Ctrl+Backspace sometimes arrived
+as a rejected Ctrl-translated control character instead of the intended
+plain letter — fixed with a one-keystroke reconstruction window in
+`KeyInput`, itself caught overreaching by code review (it briefly treated
+*any* unrecognized Ctrl-combo as eligible for reconstruction, which would
+have typed a stray letter for a genuine standalone Ctrl+V/C/X/Z/S) and
+narrowed to just the keystroke immediately following an actual
+Ctrl+A/Backspace.
+
+**Two real state/lifecycle bugs**, both found by the user through live
+testing rather than design review, both traced to the same root-cause
+pattern as an earlier session's Handler-registration bug: stale objects
+surviving a lifecycle transition without being cleaned up.
+- "Too many cards" after Menu → Resume mid-betting: both `Round`'s
+  reconstruction constructor and `Round.bet()` were unconditionally
+  re-registering the human's hand/trump card with the render `Handler`,
+  double-adding them. Fixed with a guard flag.
+- A more serious invalid-state bug via Restart Game mid-trick: stray
+  played-card slots, a stale "Led: –" readout, and gold high-card rings
+  appeared on the *next* round's fresh betting screen, despite no trick
+  having happened yet. `Trick.play()` registers played cards directly with
+  the `Handler`; a Restart/Menu confirmed mid-trick unwound past the normal
+  per-trick cleanup, leaking those `Card` objects (rings included) onto the
+  next screen. Fixed by sweeping all stray `Card` objects from the
+  `Handler` on Restart/Menu.
+
+**New diagnostic tool**, built specifically because repeated live-tested
+bug reports were hard to pin down from screenshots/memory alone: a
+flag-gated `InteractionLog` (auto-on for real `java Game` launches, off for
+the JUnit suite) recording every click's resolved control (or "no control
+matched"), every view's appearance, and process boot/shutdown (via a
+`Runtime.getRuntime().addShutdownHook()` layered on top of `Window.java`'s
+existing `JFrame.EXIT_ON_CLOSE` design, without changing it).
+
+Both bug fixes and the new logging were verified against the user's own
+recorded click-through (`interaction.log`), not just unit tests. Commits
+`307416b`, `adcde51`, and this session's final commit for everything since
+(equal-width button rows/Stats view/name-field rework's initial pass, the
+cursor/selection/arrow-key/word-jump/blink-reset follow-up, and the
+`currentWinStreak` stat gap closed during final verification).
+
 ---
 
 For why these were sequenced the way they were relative to each other (e.g.

@@ -21,6 +21,10 @@ public class TestSaveData {
         assertEquals(0, data.highScore);
         assertEquals(0, data.currentWinStreak);
         assertEquals(0, data.bestWinStreakEver);
+        assertEquals(0, data.totalPoints);
+        assertEquals(0, data.totalRoundsBet);
+        assertEquals(0, data.totalRoundsBetHit);
+        assertEquals("", data.lastUsedName);
         assertEquals(SaveData.CURRENT_SAVE_FORMAT_VERSION, data.saveFormatVersion);
         for (Achievement achievement : Achievement.values()) {
             assertFalse(data.isUnlocked(achievement));

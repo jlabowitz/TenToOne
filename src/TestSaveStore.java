@@ -99,6 +99,10 @@ public class TestSaveStore {
         original.highScore = 123;
         original.currentWinStreak = 2;
         original.bestWinStreakEver = 5;
+        original.totalPoints = 543;
+        original.totalRoundsBet = 52;
+        original.totalRoundsBetHit = 19;
+        original.lastUsedName = "Alex";
         original.unlock(Achievement.FIRST_VICTORY);
         original.unlock(Achievement.SCORE_OVER_100);
 
@@ -110,11 +114,28 @@ public class TestSaveStore {
         assertEquals(123, reloaded.highScore);
         assertEquals(2, reloaded.currentWinStreak);
         assertEquals(5, reloaded.bestWinStreakEver);
+        assertEquals(543, reloaded.totalPoints);
+        assertEquals(52, reloaded.totalRoundsBet);
+        assertEquals(19, reloaded.totalRoundsBetHit);
+        assertEquals("Alex", reloaded.lastUsedName);
         assertEquals(SaveData.CURRENT_SAVE_FORMAT_VERSION, reloaded.saveFormatVersion);
         assertTrue(reloaded.isUnlocked(Achievement.FIRST_VICTORY));
         assertTrue(reloaded.isUnlocked(Achievement.SCORE_OVER_100));
         assertFalse(reloaded.isUnlocked(Achievement.TEN_GAMES_PLAYED));
         assertEquals(original.unlockedAt(Achievement.FIRST_VICTORY), reloaded.unlockedAt(Achievement.FIRST_VICTORY));
+    }
+
+    @Test
+    public void loadReturnsEmptyLastUsedNameWhenSaveFileIsMissing() throws IOException {
+        Path saveFile = tempFolder.newFolder("missing2").toPath().resolve("save.properties");
+        SaveStore store = new SaveStore(saveFile);
+
+        SaveData data = store.load();
+
+        assertEquals("", data.lastUsedName);
+        assertEquals(0, data.totalPoints);
+        assertEquals(0, data.totalRoundsBet);
+        assertEquals(0, data.totalRoundsBetHit);
     }
 
     @Test

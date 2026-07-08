@@ -26,9 +26,19 @@ import java.awt.*;
  * (Player.legalCards, Round.isHigher/determineTrickWinner,
  * Game.adjustScores/numCardsThisRound) as of this pass -- see the
  * completion report for specifics.
+ *
+ * ROADMAP item 10 follow-up: two changes --
+ * (1) a click outside the panel now dismisses (with no other action),
+ * mirroring AchievementsView/PauseView's own miss-click convention, via the
+ * shared ModalDismiss helper (see that class's doc for why this is a static
+ * helper rather than a shared base class).
+ * (2) PANEL_H shrank (590 -> 548): LEGEND_TOP/BOTTOM's reserved-for-item-7
+ * band shrank from 80px to 40px (still a real reservation, just no longer
+ * sized as generously as an unbuilt feature's guessed footprint) and
+ * BACK_TOP/BOTTOM moved up to follow it -- see LEGEND_TOP/BOTTOM's own doc.
  */
 public class RulesView extends GameObject {
-    private static final int PANEL_X = 40, PANEL_Y = 20, PANEL_W = 760, PANEL_H = 590;
+    private static final int PANEL_X = 40, PANEL_Y = 20, PANEL_W = 760, PANEL_H = 548;
     public static final int CONTENT_LEFT = PANEL_X + 30, CONTENT_RIGHT = PANEL_X + PANEL_W - 30;
 
     private static final int TITLE_Y = 65;
@@ -58,10 +68,18 @@ public class RulesView extends GameObject {
 
     private static final int DIVIDER_Y = 480;
 
-    /** Reserved for ROADMAP item 7 (in-game legend); see class doc for why it ships empty in this pass. */
-    public static final int LEGEND_TOP = 490, LEGEND_BOTTOM = 570;
+    /**
+     * Reserved for ROADMAP item 7 (in-game legend); see class doc for why it
+     * ships empty in this pass. ROADMAP item 10 follow-up: shrank from
+     * 490-570 (80px) to 490-530 (40px) as part of trimming this panel's
+     * excess bottom dead space -- still a genuine reservation (item 7 isn't
+     * built yet, so its real footprint is unknown), just no longer sized as
+     * generously as an untested guess; a future item 7 pass is free to grow
+     * this back if 40px turns out too tight for whatever it actually needs.
+     */
+    public static final int LEGEND_TOP = 490, LEGEND_BOTTOM = 530;
 
-    private static final int BACK_TOP = 576, BACK_BOTTOM = 602;
+    private static final int BACK_TOP = 536, BACK_BOTTOM = 562;
     private static final int BACK_LEFT = 680, BACK_RIGHT = 760;
 
     /**
@@ -97,6 +115,9 @@ public class RulesView extends GameObject {
                     InteractionLog.logClick(click.x, click.y, "RulesView.Back");
                     return;
                 }
+                if (ModalDismiss.isOutsidePanel(click, view::isInsidePanel, "RulesView")) {
+                    return;
+                }
                 InteractionLog.logClick(click.x, click.y, "no control matched (RulesView)");
             }
         } finally {
@@ -107,6 +128,11 @@ public class RulesView extends GameObject {
     /** Half-open rect hit-test, same convention as BetStepper.controlAt. */
     public boolean isBackButton(int px, int py) {
         return px >= BACK_LEFT && px < BACK_RIGHT && py >= BACK_TOP && py < BACK_BOTTOM;
+    }
+
+    /** Half-open rect hit-test for the panel itself, used to distinguish an inert click on the panel from a true miss-click (see ModalDismiss). */
+    public boolean isInsidePanel(int px, int py) {
+        return px >= PANEL_X && px < PANEL_X + PANEL_W && py >= PANEL_Y && py < PANEL_Y + PANEL_H;
     }
 
     @Override

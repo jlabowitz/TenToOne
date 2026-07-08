@@ -18,18 +18,26 @@ import java.util.List;
  * whether locked or unlocked, plus the unlock date if unlocked). Hidden
  * achievements (just BAPI_EASTER_EGG today) are omitted entirely unless
  * already unlocked, per the design spec.
+ *
+ * ROADMAP item 10 follow-up: user feedback was "mostly fine, just a little
+ * big" (unlike RulesView/SettingsView, which got a bigger trim) -- ROW_HEIGHT
+ * tightened 38 -> 34 (NAME_OFFSET/STATUS_OFFSET scaled down to match, same
+ * 6px trailing gap ratio) and PANEL_H shrank 590 -> 537 accordingly. Sized
+ * for the worst case of 12 visible rows (11 always-visible achievements plus
+ * BAPI_EASTER_EGG once unlocked), not just the common 11-row case, so Back
+ * never collides with the list regardless of unlock state.
  */
 public class AchievementsView extends GameObject {
-    private static final int PANEL_X = 40, PANEL_Y = 20, PANEL_W = 760, PANEL_H = 590;
+    private static final int PANEL_X = 40, PANEL_Y = 20, PANEL_W = 760, PANEL_H = 537;
     private static final int CONTENT_LEFT = PANEL_X + 30, CONTENT_RIGHT = PANEL_X + PANEL_W - 30;
 
     private static final int TITLE_Y = 60;
     private static final int LIST_TOP = 95;
-    private static final int ROW_HEIGHT = 38;
+    private static final int ROW_HEIGHT = 34;
     private static final int NAME_OFFSET = 14;
-    private static final int STATUS_OFFSET = 32;
+    private static final int STATUS_OFFSET = 30;
 
-    private static final int BACK_TOP = 576, BACK_BOTTOM = 602;
+    private static final int BACK_TOP = 523, BACK_BOTTOM = 549;
     private static final int BACK_LEFT = 680, BACK_RIGHT = 760;
 
     private static final DateTimeFormatter UNLOCK_DATE_FORMAT =
@@ -81,8 +89,7 @@ public class AchievementsView extends GameObject {
                     InteractionLog.logClick(click.x, click.y, "AchievementsView.Back");
                     return;
                 }
-                if (!view.isInsidePanel(click.x, click.y)) {
-                    InteractionLog.logClick(click.x, click.y, "outside-panel dismiss (AchievementsView)");
+                if (ModalDismiss.isOutsidePanel(click, view::isInsidePanel, "AchievementsView")) {
                     return;
                 }
                 InteractionLog.logClick(click.x, click.y, "no control matched (AchievementsView)");

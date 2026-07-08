@@ -34,7 +34,16 @@ public class PauseView extends GameObject {
 
     private static final int TITLE_Y = PANEL_Y + 55;
 
-    private static final int RESUME_LEFT = PANEL_X + 60, RESUME_RIGHT = PANEL_X + 180;
+    /**
+     * ROADMAP item 10 follow-up bug fix: previously PANEL_X+60/+180 (a 120px
+     * button starting 60px from the panel's left edge) -- NOT centered on the
+     * panel despite looking like it should be, since the title above it *is*
+     * centered on the panel's full width via drawCentered's CONTENT_LEFT/
+     * RIGHT (symmetric 30px margins around PANEL_X..PANEL_X+PANEL_W). A
+     * 120px-wide button centered on a 300px-wide panel needs to start
+     * (300-120)/2=90px in from the left edge, not 60 -- fixed here.
+     */
+    private static final int RESUME_LEFT = PANEL_X + 90, RESUME_RIGHT = PANEL_X + 210;
     private static final int RESUME_BOTTOM = PANEL_Y + PANEL_H - 20, RESUME_TOP = RESUME_BOTTOM - 36;
 
     /**
@@ -63,8 +72,7 @@ public class PauseView extends GameObject {
                     InteractionLog.logClick(click.x, click.y, "PauseView.Resume");
                     return;
                 }
-                if (!view.isInsidePanel(click.x, click.y)) {
-                    InteractionLog.logClick(click.x, click.y, "outside-panel dismiss (PauseView)");
+                if (ModalDismiss.isOutsidePanel(click, view::isInsidePanel, "PauseView")) {
                     return;
                 }
                 InteractionLog.logClick(click.x, click.y, "no control matched (PauseView)");

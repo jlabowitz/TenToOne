@@ -87,6 +87,34 @@ public class TestAchievementEngine {
         assertFalse(data.isUnlocked(Achievement.PERFECT_ROUND));
     }
 
+    // --- checkRoundEnd: totalRoundsBet/totalRoundsBetHit (ROADMAP item 10 follow-up, StatsView) ---
+
+    @Test
+    public void checkRoundEndIncrementsTotalRoundsBetUnconditionally() {
+        SaveData data = SaveData.defaults();
+
+        AchievementEngine.checkRoundEnd(data, 5, false);
+        assertEquals(1, data.totalRoundsBet);
+
+        AchievementEngine.checkRoundEnd(data, 5, true);
+        assertEquals(2, data.totalRoundsBet);
+    }
+
+    @Test
+    public void checkRoundEndIncrementsTotalRoundsBetHitOnlyWhenBonusHit() {
+        SaveData data = SaveData.defaults();
+
+        AchievementEngine.checkRoundEnd(data, 5, false);
+        assertEquals(0, data.totalRoundsBetHit);
+
+        AchievementEngine.checkRoundEnd(data, 5, true);
+        assertEquals(1, data.totalRoundsBetHit);
+
+        AchievementEngine.checkRoundEnd(data, 5, true);
+        assertEquals(2, data.totalRoundsBetHit);
+        assertEquals(3, data.totalRoundsBet);
+    }
+
     // --- isSoleLastPlace ---
 
     @Test
@@ -225,6 +253,19 @@ public class TestAchievementEngine {
 
         List<Achievement> unlocked = AchievementEngine.checkGameEnd(data, true, 10, false, true);
         assertTrue(unlocked.contains(Achievement.COMEBACK_KID));
+    }
+
+    // --- checkGameEnd: totalPoints (ROADMAP item 10 follow-up, StatsView) ---
+
+    @Test
+    public void checkGameEndAccumulatesTotalPointsAcrossGames() {
+        SaveData data = SaveData.defaults();
+
+        AchievementEngine.checkGameEnd(data, true, 30, false, false);
+        assertEquals(30, data.totalPoints);
+
+        AchievementEngine.checkGameEnd(data, false, 15, false, false);
+        assertEquals(45, data.totalPoints);
     }
 
     @Test

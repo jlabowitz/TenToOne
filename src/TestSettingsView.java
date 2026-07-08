@@ -34,7 +34,7 @@ public class TestSettingsView {
         Thread clicker = new Thread(() -> {
             sleep50();
             deliverClick(mouseInput, 550, 135); // the toggle
-            deliverClick(mouseInput, 700, 590); // Back
+            deliverClick(mouseInput, 700, 310); // Back (ROADMAP item 10 follow-up: moved up from y=590 as part of shrinking PANEL_H 590 -> 314)
         });
         clicker.start();
 
@@ -58,7 +58,7 @@ public class TestSettingsView {
             sleep50();
             deliverClick(mouseInput, 550, 135); // toggle off
             deliverClick(mouseInput, 550, 135); // toggle back on
-            deliverClick(mouseInput, 700, 590); // Back
+            deliverClick(mouseInput, 700, 310); // Back (ROADMAP item 10 follow-up: moved up from y=590 as part of shrinking PANEL_H 590 -> 314)
         });
         clicker.start();
 
@@ -66,6 +66,42 @@ public class TestSettingsView {
         clicker.join();
 
         assertTrue(settings.pendingTotalBetsCannotEqualTricks);
+    }
+
+    // --- ROADMAP item 10 follow-up: click-outside-dismiss, via the shared
+    // ModalDismiss helper. Panel bounds: 40,20,760,314 (H trimmed from 590 in
+    // this same pass; see SettingsView's own doc).
+
+    private static final int PANEL_LEFT = 40, PANEL_TOP = 20;
+    private static final int PANEL_RIGHT = 800, PANEL_BOTTOM = 334;
+
+    @Test
+    public void isInsidePanelReflectsTheShrunkBounds() {
+        SettingsView view = new SettingsView(new GameSettings());
+        assertTrue(view.isInsidePanel(PANEL_LEFT, PANEL_TOP));
+        assertTrue(view.isInsidePanel(PANEL_RIGHT - 1, PANEL_BOTTOM - 1));
+        assertFalse(view.isInsidePanel(PANEL_LEFT - 1, PANEL_TOP));
+        assertFalse(view.isInsidePanel(PANEL_LEFT, PANEL_TOP - 1));
+        assertFalse(view.isInsidePanel(PANEL_RIGHT, PANEL_TOP));
+        assertFalse(view.isInsidePanel(PANEL_LEFT, PANEL_BOTTOM));
+    }
+
+    @Test(timeout = 5000)
+    public void clickOutsidePanelDismissesWithNoAction() throws InterruptedException {
+        Handler handler = new Handler();
+        MouseInput mouseInput = new MouseInput();
+        AchievementToast toast = new AchievementToast();
+        GameSettings settings = new GameSettings();
+
+        Thread clicker = new Thread(() -> {
+            sleep50();
+            deliverClick(mouseInput, 820, 615); // well outside the panel
+        });
+        clicker.start();
+
+        SettingsView.showBlocking(handler, mouseInput, toast, settings);
+        clicker.join();
+        // no exception / hang -- showBlocking returned, proving the miss-click resolved it
     }
 
     @Test

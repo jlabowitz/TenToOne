@@ -2,6 +2,7 @@ import org.junit.Test;
 
 import java.awt.Canvas;
 import java.awt.Component;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -105,7 +106,7 @@ public class TestGame {
          * ROADMAP item 14: the constructor's primary path now calls this
          * (not captureHumanName() above) to also offer Resume at boot -- same
          * hang risk captureHumanName's own override exists to prevent, just
-         * on the newer call site. Always reports a fresh Start Game (never
+         * on the newer call site. Always reports a fresh New Game (never
          * "resumed"). Delegates to captureHumanName(aiNames) rather than a
          * second hardcoded "You" literal, so a test subclass that overrides
          * only captureHumanName (e.g. to supply a distinct canned name) still
@@ -218,7 +219,7 @@ public class TestGame {
      * assertion can observe -- only visible on an actual screen, as doubled/
      * overlapping HUD text and garbled name rendering. Constructing a
      * HeadlessGame here already exercises the exact buggy branch (its
-     * captureStartScreenOutcome override always reports a fresh Start Game,
+     * captureStartScreenOutcome override always reports a fresh New Game,
      * never "resumed"); this reproduces play()'s own call explicitly rather
      * than actually invoking play() (which blocks forever in its own
      * game loop).
@@ -537,6 +538,121 @@ public class TestGame {
 
         assertFalse("the first click (inside the toast band) must dismiss the toast rather than being ignored",
                 toast.isShowingSomething());
+    }
+
+    // --- Review finding B: runStartScreen()'s Enter-submit polling loop had
+    // zero test coverage -- every other test in this file bypasses it
+    // entirely via HeadlessGame's captureStartScreenOutcome override. These
+    // drive the real method directly (made package-private for exactly this,
+    // mirroring awaitPlayAgain's own testability-seam precedent above),
+    // injecting keystrokes via getKeyInput() the same way the toast test
+    // above injects clicks via getMouseInput(). ---
+
+    /**
+     * The simplest real path through runStartScreen(): type a name and press
+     * Enter, with no nested view or Resume involved. Confirms
+     * consumeSubmitRequested()/attemptStartSubmit() actually wire together
+     * correctly end to end -- previously only exercised piecemeal (StartScreen's
+     * own submit()/consumeSubmitRequested() in isolation, attemptStartSubmit's
+     * validation logic not at all from this loop).
+     */
+    @Test(timeout = 5000)
+    public void runStartScreenEnterKeySubmitsTypedNameAsOutcome() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        KeyInput keyInput = game.getKeyInput();
+
+        Thread typer = new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            typeChar(keyInput, 'A');
+            typeChar(keyInput, 'l');
+            typeChar(keyInput, 'e');
+            typeChar(keyInput, 'x');
+            pressEnter(keyInput);
+        });
+        typer.start();
+
+        Game.StartScreenOutcome outcome = game.runStartScreen(HEADLESS_PLAYER_NAMES, false);
+        typer.join();
+
+        assertFalse(outcome.resumed);
+        assertEquals("Alex", outcome.humanName);
+    }
+
+    /**
+     * Code-review Finding A: a stray Enter pressed while a nested view
+     * (Rules/Achievements/Settings/Stats) is showing on top of the Start
+     * Screen must not leak through and fire the backgrounded StartScreen's
+     * submit once the nested view closes -- keyInput.setTarget(startScreen)
+     * stays pinned to the same instance the whole time nested views are
+     * shown, so before this fix, a stray Enter's submitRequested flag
+     * survived RulesView.showBlocking() returning and was wrongly consumed
+     * on the very next loop iteration.
+     *
+     * Made maximally observable via offerResume=true + a real resumable
+     * checkpoint: if the stray Enter leaks, runStartScreen() returns
+     * StartScreenOutcome.resume() the instant Rules' Back button is clicked
+     * (resumable's branch returns unconditionally, no validation) -- long
+     * before the driver thread ever reaches its later, deliberate
+     * type-a-name-and-click-Start steps below. The final deliberate step
+     * uses a mouse click on Start (not Enter) deliberately: with
+     * resumable=true, Enter *always* resolves to Resume by design (see
+     * runStartScreen's own doc), so a second Enter here couldn't distinguish
+     * "leaked" from "not leaked" -- both would return resume(). A real click
+     * on Start's paired slot forces attemptStartSubmit's name path instead,
+     * giving a StartScreenOutcome.name("Al") result that's only reachable if
+     * the loop was still alive and waiting normally, not one that already
+     * returned early.
+     */
+    @Test(timeout = 5000)
+    public void staleEnterSubmitWhileNestedViewIsOpenDoesNotLeakIntoNextIteration() throws InterruptedException {
+        Game game = new HeadlessGame(HEADLESS_PLAYER_NAMES);
+        game.saveGameStateCheckpoint();
+        assertTrue("a checkpoint save must make hasResumableGame() true", game.hasResumableGame());
+
+        MouseInput mouseInput = game.getMouseInput();
+        KeyInput keyInput = game.getKeyInput();
+
+        Thread driver = new Thread(() -> {
+            try {
+                Thread.sleep(50);
+                deliverClick(mouseInput, 300, 385); // Row 2's Rules button (always at this spot)
+                Thread.sleep(50);
+                pressEnter(keyInput); // stray Enter while RulesView is blocking on its own click loop
+                Thread.sleep(50);
+                deliverClick(mouseInput, 720, 549); // RulesView's Back button
+                Thread.sleep(50);
+                typeChar(keyInput, 'A');
+                typeChar(keyInput, 'l');
+                deliverClick(mouseInput, 500, 335); // Start's paired-with-Resume slot (Row 1)
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        driver.start();
+
+        Game.StartScreenOutcome outcome = game.runStartScreen(HEADLESS_PLAYER_NAMES, true);
+        driver.join();
+
+        assertFalse("a stray Enter pressed while Rules was open must not have leaked into an unconditional Resume",
+                outcome.resumed);
+        assertEquals("Al", outcome.humanName);
+    }
+
+    private static void typeChar(KeyInput keyInput, char c) {
+        Component dummy = new Canvas();
+        keyInput.keyTyped(new KeyEvent(dummy, KeyEvent.KEY_TYPED, System.currentTimeMillis(),
+                0, KeyEvent.VK_UNDEFINED, c));
+    }
+
+    private static void pressEnter(KeyInput keyInput) {
+        Component dummy = new Canvas();
+        keyInput.keyPressed(new KeyEvent(dummy, KeyEvent.KEY_PRESSED, System.currentTimeMillis(),
+                0, KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED));
     }
 
     /**
@@ -928,8 +1044,8 @@ public class TestGame {
      * Code-review Finding 2: the same Handler re-registration bug class
      * abandonAndRestartReRegistersPlayersWithTheHandler proves fixed for the
      * Restart path had no dedicated regression test for the Menu -> fresh
-     * Start Game path (establishFreshGameState(), reached when the player
-     * picks Menu then declines Resume in favor of a fresh name/Start Game).
+     * New Game path (establishFreshGameState(), reached when the player
+     * picks Menu then declines Resume in favor of a fresh name/New Game).
      * cleanupHandlerForMenuOrRestart() removes the old players from the
      * Handler the same way it does before a Restart; establishFreshGameState()
      * builds a brand-new player list and must register every one of them via

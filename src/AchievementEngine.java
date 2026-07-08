@@ -25,6 +25,15 @@ public class AchievementEngine {
      */
     public static List<Achievement> checkRoundEnd(SaveData data, int humanScoreAfterRound, boolean bonusHitThisRound) {
         List<Achievement> newlyUnlocked = new ArrayList<>();
+
+        //ROADMAP item 10 follow-up (StatsView): betting is mandatory every
+        //round, so every checkRoundEnd() call is one more round the human
+        //bet in -- incremented unconditionally, not gated on bonusHitThisRound.
+        data.totalRoundsBet++;
+        if (bonusHitThisRound) {
+            data.totalRoundsBetHit++;
+        }
+
         if (humanScoreAfterRound > 50 && data.unlock(Achievement.SCORE_OVER_50)) {
             newlyUnlocked.add(Achievement.SCORE_OVER_50);
         }
@@ -76,6 +85,10 @@ public class AchievementEngine {
         }
         data.bestWinStreakEver = Math.max(data.bestWinStreakEver, data.currentWinStreak);
         data.highScore = Math.max(data.highScore, finalHumanScore);
+        //ROADMAP item 10 follow-up (StatsView): running sum of every game's
+        //final human score -- divide by gamesPlayed for an average-score
+        //derived stat (see StatsView.averageScorePerGame).
+        data.totalPoints += finalHumanScore;
 
         if (humanWon && data.unlock(Achievement.FIRST_VICTORY)) {
             newlyUnlocked.add(Achievement.FIRST_VICTORY);

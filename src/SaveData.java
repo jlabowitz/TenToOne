@@ -25,6 +25,39 @@ public class SaveData {
     public int highScore = 0;
     public int currentWinStreak = 0;
     public int bestWinStreakEver = 0;
+
+    /**
+     * ROADMAP item 10 follow-up (StatsView): sum of the human's final score
+     * across every completed game -- updated alongside the other game-end
+     * stats in AchievementEngine.checkGameEnd(). Divide by gamesPlayed for an
+     * average-score-per-game derived stat (see StatsView.averageScorePerGame).
+     */
+    public int totalPoints = 0;
+
+    /**
+     * ROADMAP item 10 follow-up (StatsView): totalRoundsBet is every round
+     * the human has ever placed a bet in (incremented unconditionally, once
+     * per round, in AchievementEngine.checkRoundEnd() -- betting is
+     * mandatory every round, so this is exactly "rounds played"), and
+     * totalRoundsBetHit is the subset where that round's bet matched tricks
+     * won (the same bonusHitThisRound condition PERFECT_ROUND already keys
+     * off). Divide the two for a "hit your bet" percentage -- see
+     * StatsView.betHitPercent.
+     */
+    public int totalRoundsBet = 0;
+    public int totalRoundsBetHit = 0;
+
+    /**
+     * ROADMAP item 10 follow-up (Start Screen name-field rework): the last
+     * name actually submitted via the Start Screen's New Game button (or
+     * Enter-to-submit) -- prepopulates the name field on next launch instead
+     * of always starting empty. Deliberately lives here (persisted via
+     * SaveStore, round-tripping across process launches) rather than on
+     * GameSettings, which holds only in-memory, per-process settings with no
+     * persistence mechanism at all -- see GameSettings' own class doc.
+     */
+    public String lastUsedName = "";
+
     public final Map<String, Instant> unlockedAchievements = new HashMap<>();
 
     /** Sensible defaults for a missing/corrupt save file -- zeroed stats, nothing unlocked. */

@@ -17,10 +17,15 @@ import static org.junit.Assert.assertTrue;
  * earlier Resume-only dismiss meant a miss-click looped forever. Resume's
  * geometry moved accordingly (PANEL_X=270, PANEL_Y=235; Resume at
  * x=[330,450), y=[339,375)).
+ *
+ * Bug fix (this pass): Resume's slot was never actually centered on the
+ * panel (60px from the left edge for a 120px button in a 300px-wide panel --
+ * centering needs 90px) despite the title above it being centered on that
+ * same full panel width -- Resume moved to x=[360,480) to match.
  */
 public class TestPauseView {
 
-    private static final int RESUME_LEFT = 330, RESUME_RIGHT = 450;
+    private static final int RESUME_LEFT = 360, RESUME_RIGHT = 480;
     private static final int RESUME_TOP = 339, RESUME_BOTTOM = 375;
 
     @Test(timeout = 5000)
@@ -31,7 +36,7 @@ public class TestPauseView {
 
         Thread clicker = new Thread(() -> {
             sleep50();
-            deliverClick(mouseInput, 390, 350); // Resume button
+            deliverClick(mouseInput, 420, 350); // Resume button
         });
         clicker.start();
 
@@ -92,7 +97,7 @@ public class TestPauseView {
         Thread clicker = new Thread(() -> {
             sleep50();
             deliverClick(mouseInput, 400, 20); // inside the toast's dismiss band
-            deliverClick(mouseInput, 390, 350); // Resume
+            deliverClick(mouseInput, 420, 350); // Resume
         });
         clicker.start();
 

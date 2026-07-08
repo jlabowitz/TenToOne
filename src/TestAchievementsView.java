@@ -14,15 +14,17 @@ import static org.junit.Assert.assertTrue;
  * class doc), so this locks in the same contract TestRulesView does.
  */
 public class TestAchievementsView {
-    private static final int TOP = 576;
-    private static final int BOTTOM = 602;
+    // ROADMAP item 10 follow-up: Back moved up from 576/602 to 523/549 as
+    // part of shrinking PANEL_H 590 -> 537 -- see that class's own doc.
+    private static final int TOP = 523;
+    private static final int BOTTOM = 549;
     private static final int LEFT = 680;
     private static final int RIGHT = 760;
 
     @Test
     public void clickInsideBackReturnsTrue() {
         AchievementsView view = new AchievementsView(SaveData.defaults());
-        assertTrue(view.isBackButton(720, 590));
+        assertTrue(view.isBackButton(720, 535));
     }
 
     @Test
@@ -34,7 +36,7 @@ public class TestAchievementsView {
     @Test
     public void rightAndBottomBoundaryIsExclusive() {
         AchievementsView view = new AchievementsView(SaveData.defaults());
-        assertFalse(view.isBackButton(RIGHT, 590));
+        assertFalse(view.isBackButton(RIGHT, 535));
         assertFalse(view.isBackButton(720, BOTTOM));
         assertTrue(view.isBackButton(RIGHT - 1, BOTTOM - 1));
     }
@@ -47,11 +49,11 @@ public class TestAchievementsView {
     }
 
     // ROADMAP item 10 follow-up: click-outside-dismiss, mirroring
-    // HamburgerMenu/PauseView's own miss-click convention -- this panel's own
-    // layout is unchanged (PANEL_X/Y/W/H=40/20/760/590), only this new
-    // dismiss behavior was added.
+    // HamburgerMenu/PauseView's own miss-click convention -- panel bounds
+    // are PANEL_X/Y/W/H=40/20/760/537 (H trimmed from 590 in this same pass;
+    // see AchievementsView's own doc).
     private static final int PANEL_LEFT = 40, PANEL_TOP = 20;
-    private static final int PANEL_RIGHT = 800, PANEL_BOTTOM = 610;
+    private static final int PANEL_RIGHT = 800, PANEL_BOTTOM = 557;
 
     @Test
     public void isInsidePanelReflectsTheUnchangedFullCanvasBounds() {
@@ -161,7 +163,7 @@ public class TestAchievementsView {
                 return;
             }
             deliverClick(mouseInput, 400, 20); // inside the toast's dismiss band (y < 50), clear of the Back button
-            deliverClick(mouseInput, 720, 590); // the real Back button
+            deliverClick(mouseInput, 720, 535); // the real Back button
         });
         clicker.start();
 

@@ -21,9 +21,19 @@ import java.awt.*;
  * own class doc. This view renders the *pending* value's checked state, so
  * reopening Settings before a new game starts still shows what you last
  * chose (not the live value your current game is running with).
+ *
+ * ROADMAP item 10 follow-up: two more changes -- (1) a click outside the
+ * panel now dismisses (with no other action), via the shared ModalDismiss
+ * helper (see that class's doc); (2) user feedback was "way too big" for
+ * this page's sparse single-checkbox content, so PANEL_H shrank
+ * substantially (590 -> 314) rather than being trimmed to the theoretical
+ * minimum around today's one toggle -- the user mentioned upcoming
+ * visual-effects settings, so there's deliberately ~120px of blank room
+ * between NOTE_Y and Back left for 1-2 more toggle-style rows before this
+ * needs resizing again.
  */
 public class SettingsView extends GameObject {
-    private static final int PANEL_X = 40, PANEL_Y = 20, PANEL_W = 760, PANEL_H = 590;
+    private static final int PANEL_X = 40, PANEL_Y = 20, PANEL_W = 760, PANEL_H = 314;
     private static final int CONTENT_LEFT = PANEL_X + 30, CONTENT_RIGHT = PANEL_X + PANEL_W - 30;
 
     private static final int TITLE_Y = 60;
@@ -39,7 +49,7 @@ public class SettingsView extends GameObject {
 
     private static final int NOTE_Y = TOGGLE_BOTTOM + 26;
 
-    private static final int BACK_TOP = 576, BACK_BOTTOM = 602;
+    private static final int BACK_TOP = 300, BACK_BOTTOM = 326;
     private static final int BACK_LEFT = 680, BACK_RIGHT = 760;
 
     private final GameSettings gameSettings;
@@ -77,6 +87,9 @@ public class SettingsView extends GameObject {
                     InteractionLog.logClick(click.x, click.y, "SettingsView.Back");
                     return;
                 }
+                if (ModalDismiss.isOutsidePanel(click, view::isInsidePanel, "SettingsView")) {
+                    return;
+                }
                 InteractionLog.logClick(click.x, click.y, "no control matched (SettingsView)");
             }
         } finally {
@@ -92,6 +105,11 @@ public class SettingsView extends GameObject {
     /** Half-open rect hit-test for the checkbox toggle -- deliberately larger than the drawn checkbox square itself, for a generous touch target. */
     public boolean isToggleHotspot(int px, int py) {
         return px >= TOGGLE_LEFT && px < TOGGLE_RIGHT && py >= TOGGLE_TOP && py < TOGGLE_BOTTOM;
+    }
+
+    /** Half-open rect hit-test for the panel itself, used to distinguish an inert click on the panel from a true miss-click (see ModalDismiss). */
+    public boolean isInsidePanel(int px, int py) {
+        return px >= PANEL_X && px < PANEL_X + PANEL_W && py >= PANEL_Y && py < PANEL_Y + PANEL_H;
     }
 
     @Override

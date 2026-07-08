@@ -113,6 +113,10 @@ public class SaveStore {
             data.highScore = Integer.parseInt(props.getProperty("stats.highScore", "0"));
             data.currentWinStreak = Integer.parseInt(props.getProperty("stats.currentWinStreak", "0"));
             data.bestWinStreakEver = Integer.parseInt(props.getProperty("stats.bestWinStreakEver", "0"));
+            data.totalPoints = Integer.parseInt(props.getProperty("stats.totalPoints", "0"));
+            data.totalRoundsBet = Integer.parseInt(props.getProperty("stats.totalRoundsBet", "0"));
+            data.totalRoundsBetHit = Integer.parseInt(props.getProperty("stats.totalRoundsBetHit", "0"));
+            data.lastUsedName = props.getProperty("profile.lastUsedName", "");
             for (Achievement achievement : Achievement.values()) {
                 String value = props.getProperty("achievement." + achievement.name() + ".unlockedAt");
                 if (value != null) {
@@ -165,6 +169,10 @@ public class SaveStore {
         props.setProperty("stats.highScore", String.valueOf(data.highScore));
         props.setProperty("stats.currentWinStreak", String.valueOf(data.currentWinStreak));
         props.setProperty("stats.bestWinStreakEver", String.valueOf(data.bestWinStreakEver));
+        props.setProperty("stats.totalPoints", String.valueOf(data.totalPoints));
+        props.setProperty("stats.totalRoundsBet", String.valueOf(data.totalRoundsBet));
+        props.setProperty("stats.totalRoundsBetHit", String.valueOf(data.totalRoundsBetHit));
+        props.setProperty("profile.lastUsedName", data.lastUsedName == null ? "" : data.lastUsedName);
         for (Map.Entry<String, Instant> entry : data.unlockedAchievements.entrySet()) {
             props.setProperty("achievement." + entry.getKey() + ".unlockedAt", entry.getValue().toString());
         }

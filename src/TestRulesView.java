@@ -10,18 +10,19 @@ import static org.junit.Assert.assertTrue;
 /**
  * Tests for RulesView.isBackButton, the only interactive hit-test this class
  * exposes (ROADMAP item 1). Layout contract: Back covers x in [680, 760),
- * y in [576, 602).
+ * y in [536, 562) (ROADMAP item 10 follow-up: moved up from 576/602 as part
+ * of shrinking PANEL_H 590 -> 548 -- see that class's own doc).
  */
 public class TestRulesView {
-    private static final int TOP = 576;
-    private static final int BOTTOM = 602;
+    private static final int TOP = 536;
+    private static final int BOTTOM = 562;
     private static final int LEFT = 680;
     private static final int RIGHT = 760;
 
     @Test
     public void clickInsideBackReturnsTrue() {
         RulesView view = new RulesView();
-        assertTrue(view.isBackButton(720, 590));
+        assertTrue(view.isBackButton(720, 550));
     }
 
     @Test
@@ -33,7 +34,7 @@ public class TestRulesView {
     @Test
     public void rightAndBottomBoundaryIsExclusive() {
         RulesView view = new RulesView();
-        assertFalse(view.isBackButton(RIGHT, 590));
+        assertFalse(view.isBackButton(RIGHT, 550));
         assertFalse(view.isBackButton(720, BOTTOM));
         // last in-bounds pixel still hits
         assertTrue(view.isBackButton(RIGHT - 1, BOTTOM - 1));
@@ -49,8 +50,8 @@ public class TestRulesView {
     @Test
     public void clickLeftOrRightOfButtonReturnsFalse() {
         RulesView view = new RulesView();
-        assertFalse(view.isBackButton(LEFT - 1, 590));
-        assertFalse(view.isBackButton(RIGHT, 590));
+        assertFalse(view.isBackButton(LEFT - 1, 550));
+        assertFalse(view.isBackButton(RIGHT, 550));
     }
 
     @Test
@@ -58,6 +59,47 @@ public class TestRulesView {
         RulesView view = new RulesView();
         assertFalse(view.isBackButton(0, 0));
         assertFalse(view.isBackButton(400, 300));
+    }
+
+    // --- ROADMAP item 10 follow-up: click-outside-dismiss, via the shared
+    // ModalDismiss helper -- same convention AchievementsView/PauseView
+    // already had, added here for the first time (SettingsView gets the same
+    // treatment; see TestSettingsView). Panel bounds: 40,20,760,548.
+
+    private static final int PANEL_LEFT = 40, PANEL_TOP = 20;
+    private static final int PANEL_RIGHT = 800, PANEL_BOTTOM = 568;
+
+    @Test
+    public void isInsidePanelReflectsTheFullCanvasBounds() {
+        RulesView view = new RulesView();
+        assertTrue(view.isInsidePanel(PANEL_LEFT, PANEL_TOP));
+        assertTrue(view.isInsidePanel(PANEL_RIGHT - 1, PANEL_BOTTOM - 1));
+        assertFalse(view.isInsidePanel(PANEL_LEFT - 1, PANEL_TOP));
+        assertFalse(view.isInsidePanel(PANEL_LEFT, PANEL_TOP - 1));
+        assertFalse(view.isInsidePanel(PANEL_RIGHT, PANEL_TOP));
+        assertFalse(view.isInsidePanel(PANEL_LEFT, PANEL_BOTTOM));
+    }
+
+    @Test(timeout = 5000)
+    public void clickOutsidePanelDismissesWithNoAction() throws InterruptedException {
+        Handler handler = new Handler();
+        MouseInput mouseInput = new MouseInput();
+        AchievementToast toast = new AchievementToast();
+
+        Thread clicker = new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            deliverClick(mouseInput, 820, 615); // well outside the panel
+        });
+        clicker.start();
+
+        RulesView.showBlocking(handler, mouseInput, toast);
+        clicker.join();
+        // no exception / hang -- showBlocking returned, proving the miss-click resolved it
     }
 
     /**
@@ -93,7 +135,7 @@ public class TestRulesView {
                 return;
             }
             deliverClick(mouseInput, 400, 20); // inside the toast's dismiss band (y < 50), clear of the Back button
-            deliverClick(mouseInput, 720, 590); // the real Back button
+            deliverClick(mouseInput, 720, 550); // the real Back button
         });
         clicker.start();
 
